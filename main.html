@@ -1,0 +1,2976 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Drawing From Memory - Lobby & Zeichenbrett</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+    <style>
+      /* Inter font für bessere Ästhetik */
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap");
+
+      body {
+        font-family: "Inter", sans-serif;
+        /* Sanfter Farbverlauf von dunklem Violett zu hellerem Lila */
+        background-image: linear-gradient(-45deg, #2A1A59, #4B3A9D);
+        background-size: 400% 400%;
+        animation: gradientAnimation 15s ease infinite;
+        color: #E0E0E0; /* Standardtextfarbe für den Body */
+      }
+
+      /* Hintergrundanimation */
+      @keyframes gradientAnimation {
+        0% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+        100% {
+          background-position: 0% 50%;
+        }
+      }
+
+      /* Typografie für Überschriften */
+      h1, h2, h3 {
+          color: #C5B8FF; /* Leicht lila getönter Farbton für Überschriften */
+      }
+      h1 {
+          font-size: 2rem; /* text-2xl - reduced from 2.25rem */
+      }
+      @media (min-width: 768px) { /* md breakpoint */
+          h1 {
+              font-size: 2.5rem; /* md:text-3xl - reduced from 3rem */
+          }
+      }
+      @media (min-width: 1024px) { /* lg breakpoint */
+          h1 {
+              font-size: 3rem; /* lg:text-4xl - reduced from 3.75rem */
+          }
+      }
+      h2 {
+          font-size: 1.5rem; /* text-2xl */
+      }
+      @media (min-width: 768px) {
+          h2 {
+              font-size: 1.875rem; /* md:text-3xl */
+          }
+      }
+      h3 {
+          font-size: 1.25rem; /* text-xl */
+      }
+      @media (min-width: 768px) {
+          h3 {
+              font-size: 1.5rem; /* md:text-2xl */
+          }
+      }
+
+      /* Styling für Farbauswahl und Canvas */
+      .color-swatch {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%; /* Runde Farbfelder */
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Schatten hinzugefügt */
+      }
+      .color-swatch:hover {
+        transform: scale(1.1);
+        box-shadow: 0 0 10px rgba(123, 77, 255, 0.5); /* Lila Schatten beim Hover */
+      }
+      .color-swatch.selected {
+        border-color: #7B4DFF; /* Lila Rand für ausgewählte Farbe */
+        box-shadow: 0 0 12px rgba(123, 77, 255, 0.9); /* Stärkerer Lila Schatten */
+        transform: scale(1.05); /* Leichter Zoom für ausgewählte Farbe */
+      }
+      canvas {
+        background-color: #FFFFFF; /* Canvas Hintergrundfarbe */
+        border-radius: 0.75rem; /* Abgerundete Ecken */
+        touch-action: none; /* Verhindert Standard-Touch-Gesten wie Scrollen */
+        transition: border-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+        border: 3px solid transparent; /* Standardmäßig kein Rand */
+        min-width: 200px;
+        min-height: 150px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); /* Standard Schatten */
+      }
+      canvas.drawing-active {
+        border-color: #7B4DFF; /* Lila Rand wenn Zeichnen aktiv ist */
+        box-shadow: 0 0 20px rgba(123, 77, 255, 0.8); /* Leuchtender Lila Schatten beim Zeichnen */
+      }
+
+      /* Styling für den Farbwähler */
+      #colorPickerInput {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        width: 40px; /* Etwas größer als Farbfelder */
+        height: 40px;
+        background-color: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+        border-radius: 0.5rem; /* Leicht abgerundet */
+        overflow: hidden; /* Verbirgt den Standardrand */
+        border: 2px solid transparent; /* Standardrand */
+        transition: border-color 0.2s, box-shadow 0.2s;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Schatten hinzugefügt */
+      }
+      #colorPickerInput::-webkit-color-swatch {
+        border-radius: 0.5rem;
+        border: none; /* Kein innerer Rand */
+      }
+      #colorPickerInput::-moz-color-swatch {
+        border-radius: 0.5rem;
+        border: none; /* Kein innerer Rand */
+      }
+      #colorPickerInput.selected-picker {
+        border-color: #7B4DFF; /* Lila Rand */
+        box-shadow: 0 0 12px rgba(123, 77, 255, 0.9); /* Stärkerer Lila Schatten */
+      }
+
+      /* Styling für aktive Werkzeug-Buttons */
+      .tool-button.active {
+        background-image: linear-gradient(to right, #7B4DFF, #9B7DFF); /* Aktiver Lila-Verlauf */
+        box-shadow: 0 0 15px rgba(123, 77, 255, 0.9); /* Leuchtender Lila Schatten */
+        transform: translateY(-2px); /* Leichter "Pop" Effekt */
+      }
+
+      /* Allgemeines Button-Styling für bessere Ästhetik */
+      .styled-button {
+        transition: all 0.3s ease;
+        border: none;
+        outline: none;
+        position: relative;
+        overflow: hidden;
+        z-index: 1;
+        background-image: linear-gradient(to right, #7B4DFF, #9B7DFF); /* Lila-Verlauf */
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtiler Schatten */
+      }
+
+      .styled-button:hover {
+        background-image: linear-gradient(to right, #9B7DFF, #7B4DFF); /* Umgekehrter Verlauf beim Hover */
+        box-shadow: 0 6px 10px rgba(0, 0, 0, 0.2); /* Tieferer Schatten beim Hover */
+      }
+
+      .styled-button:before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 300%;
+        height: 300%;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 50%;
+        transition: all 0.5s ease-out;
+        transform: translate(-50%, -50%) scale(0);
+        z-index: -1;
+      }
+
+      .styled-button:hover:before {
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      .styled-button:active {
+        transform: scale(0.98);
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      /* Spezifische Button-Farbanpassungen */
+      .styled-button.bg-blue-600 { /* Wird durch das allgemeine styled-button ersetzt */
+          background-image: linear-gradient(to right, #7B4DFF, #9B7DFF);
+      }
+      .styled-button.bg-green-500 {
+        background-image: linear-gradient(
+          to right,
+          #22c55e,
+          #10b981
+        ); /* Grüner Verlauf */
+      }
+      .styled-button.bg-red-600 {
+        background-image: linear-gradient(
+          to right,
+          #ef4444,
+          #dc2626
+        ); /* Roter Verlauf */
+      }
+      .styled-button.bg-gray-700 {
+        background-image: linear-gradient(
+          to right,
+          #3A3A3A,
+          #4B4B4B
+        ); /* Dunkelgrauer Verlauf für Zurück/Löschen */
+        color: #E0E0E0;
+      }
+      .styled-button.bg-gray-500 { /* Deaktivierte Buttons */
+        background-image: linear-gradient(to right, #3A3A3A, #3A3A3A); /* Solides Dunkelgrau */
+        cursor: not-allowed;
+        opacity: 0.7;
+        box-shadow: none;
+      }
+      .styled-button.bg-gray-500:hover {
+        background-image: linear-gradient(to right, #3A3A3A, #3A3A3A);
+        box-shadow: none;
+        transform: none;
+      }
+
+      /* Input- und Select-Feld-Styling */
+      .styled-input {
+        background-color: #FFFFFF; /* Weißer Hintergrund */
+        border: 1px solid #CCCCCC; /* Hellgrauer Rand */
+        border-radius: 0.5rem; /* Abgerundete Ecken */
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); /* Leichter Schatten */
+        transition: all 0.3s ease;
+        color: #333333; /* Dunkle Textfarbe */
+      }
+      .styled-input:focus {
+        border-color: #6600CC; /* Aktiver Lila-Rand */
+        box-shadow: 0 0 0 3px rgba(102, 0, 204, 0.3), 0 4px 8px rgba(0, 0, 0, 0.1); /* Aktiver Schatten */
+        outline: none;
+      }
+      .styled-input option {
+        background-color: #FFFFFF; /* Hintergrund für Optionen */
+        color: #333333; /* Textfarbe für Optionen */
+      }
+
+      /* Benutzerdefinierte Scrollbar für bessere Ästhetik */
+      ::-webkit-scrollbar {
+        width: 10px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(123, 77, 255, 0.7); /* Lila Scrollbar */
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #9B7DFF; /* Helleres Lila beim Hover */
+      }
+
+      /* Animationen für Modals */
+      @keyframes fade-in {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes scale-in {
+        from {
+          transform: scale(0.95);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      .animate-fade-in {
+        animation: fade-in 0.3s ease-out forwards;
+      }
+      .animate-scale-in {
+        animation: scale-in 0.3s ease-out forwards;
+      }
+
+      /* Styling for active sidebar item */
+      .sidebar-item.active-section {
+          background-color: #4B3A9D; /* Highlight color */
+          color: white;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+          transform: translateX(5px); /* Slight visual pop */
+      }
+
+      /* Mobile sidebar behavior */
+      @media (max-width: 767px) { /* Applies only to screens smaller than md (768px) */
+          #sidebar {
+              transform: translateX(-100%); /* Hidden by default */
+          }
+          #sidebar.open {
+              transform: translateX(0); /* Open when 'open' class is added */
+          }
+      }
+
+      /* Custom opacity for text within drawingOverlay */
+      .drawing-overlay-text {
+        opacity: 0.9; /* Set text opacity to 90% */
+      }
+
+      /* Styling for word suggestion buttons */
+      .suggestion-button {
+        background-color: #6A3AB7; /* A slightly lighter purple */
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s ease, transform 0.1s ease;
+      }
+
+      .suggestion-button:hover {
+        background-color: #7B4DFF; /* Darker purple on hover */
+        transform: translateY(-1px);
+      }
+    </style>
+  </head>
+  <body class="min-h-screen flex flex-col font-inter">
+    <header
+      class="fixed top-0 left-0 right-0 z-40 w-full h-16 md:h-14 bg-gradient-to-r from-[#1F1B38] to-[#2A1A59] text-white flex items-center justify-center shadow-lg"
+    >
+      <h1 class="text-2xl md:text-3xl lg:text-4xl font-bold text-center text-[#C5B8FF]">
+        Drawing From Memory
+      </h1>
+      <button
+        id="sidebarToggle"
+        class="md:hidden fixed left-4 top-4 text-white text-2xl z-50 p-2 rounded-full bg-black bg-opacity-50"
+        aria-label="Sidebar öffnen/schließen"
+      >
+        <i class="fas fa-bars"></i>
+      </button>
+    </header>
+
+    <div class="flex flex-grow pt-16 md:pt-14">
+      <nav
+        id="sidebar"
+        class="fixed top-16 md:top-14 left-0 bottom-0 w-64 md:w-72 bg-[#1F1B38] text-white p-4 z-30 shadow-xl transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out"
+      >
+        <div class="flex flex-col gap-6 mt-8">
+          <a
+            id="sidebar-home"
+            href="#"
+            class="sidebar-item flex items-center gap-3 p-3 rounded-lg text-lg font-semibold text-gray-300 hover:bg-[#4B3A9D] hover:text-white transition-colors duration-200"
+          >
+            <i class="fas fa-home text-[#C5B8FF]"></i> Startseite
+          </a>
+          <a
+            id="sidebar-game"
+            href="#"
+            class="sidebar-item flex items-center gap-3 p-3 rounded-lg text-lg font-semibold text-gray-300 hover:bg-[#4B3A9D] hover:text-white transition-colors duration-200"
+          >
+            <i class="fas fa-gamepad text-[#C5B8FF]"></i> Spiel starten
+          </a>
+          <a
+            id="sidebar-lobby-info"
+            href="#"
+            class="sidebar-item flex items-center gap-3 p-3 rounded-lg text-lg font-semibold text-gray-300 hover:bg-[#4B3A9D] hover:text-white transition-colors duration-200"
+            style="pointer-events: none; cursor: default;"
+          >
+            <i class="fas fa-info-circle text-[#C5B8FF]"></i> Lobby-Info
+          </a>
+        </div>
+      </nav>
+
+      <main
+        class="flex-grow md:ml-72 p-6 transition-all duration-300 ease-in-out"
+      >
+        <div
+          class="w-full md:max-w-5xl md:mx-auto p-6 bg-[#1F1B38] bg-opacity-90 rounded-3xl shadow-2xl my-6 border border-[#4B3A9D]"
+        >
+          <section id="nameInputSection" class="flex flex-col gap-5">
+            <div class="text-center text-sm mb-2 text-[#E0E0E0]" id="currentUserId">
+              Deine ID: Wird geladen...
+            </div>
+            <h2 class="text-2xl font-bold text-center text-[#C5B8FF]">
+              Gib deinen Namen ein
+            </h2>
+            <label
+              for="playerNameInput"
+              class="font-semibold text-lg text-[#E0E0E0] sr-only"
+              >Dein Name:</label
+            >
+            <input
+              type="text"
+              id="playerNameInput"
+              placeholder="Dein Name"
+              class="p-3 text-base rounded-lg styled-input w-full"
+            />
+            <button
+              id="continueBtn"
+              class="py-3 px-4 text-lg rounded-lg bg-blue-600 text-white styled-button font-bold shadow-lg hover:shadow-xl"
+            >
+              Weiter
+            </button>
+          </section>
+
+          <section id="lobbySelectionSection" class="hidden flex flex-col gap-5">
+            <!-- Der "Zurück"-Knopf wurde hier entfernt, wie gewünscht.
+            <button
+              id="backToNameInputBtn"
+              class="absolute top-4 left-4 py-2 px-3 text-sm rounded-full bg-gray-700 text-white styled-button shadow-md hover:shadow-lg"
+              title="Namen ändern"
+            >
+              <i class="fas fa-arrow-left"></i> Zurück
+            </button>
+            -->
+
+            <h2 class="text-2xl font-bold text-center text-[#C5B8FF] mt-10">
+              Wähle eine Option
+            </h2>
+
+            <div
+              class="flex flex-col gap-5 p-5 bg-[#2A1A59] bg-opacity-70 rounded-xl shadow-inner border border-[#4B3A9D]"
+            >
+              <h3 class="text-xl font-semibold text-[#C5B8FF]">Spiel erstellen</h3>
+              <label for="playerCount" class="font-semibold text-lg text-[#E0E0E0]"
+                >Spieleranzahl wählen (2-6):</label
+                >
+              <select
+                id="playerCount"
+                name="playerCount"
+                aria-label="Spieleranzahl wählen"
+                class="p-3 text-base rounded-lg styled-input w-full"
+              >
+                <option value="2">2 Spieler</option>
+                <option value="3">3 Spieler</option>
+                <option value="4" selected>4 Spieler</option>
+                <option value="5">5 Spieler</option>
+                <option value="6">6 Spieler</option>
+              </select>
+
+              <label
+                for="roundDurationSelect"
+                class="font-semibold text-lg text-[#E0E0E0]"
+                >Zeichenzeit pro Runde:</label
+              >
+              <select
+                id="roundDurationSelect"
+                name="roundDuration"
+                aria-label="Zeichenzeit pro Runde wählen"
+                class="p-3 text-base rounded-lg styled-input w-full"
+              >
+                <option value="30">30 Sekunden</option>
+                <option value="60" selected>1 Minute</option>
+                <option value="120">2 Minuten</option>
+                <option value="180">3 Minuten</option>
+                <option value="Infinity">∞ Unendlich</option>
+              </select>
+
+              <label for="maxRoundsSelect" class="font-semibold text-lg text-[#E0E0E0]"
+                >Anzahl der Runden:</label
+              >
+              <select
+                id="maxRoundsSelect"
+                name="maxRounds"
+                aria-label="Anzahl der Runden wählen"
+                class="p-3 text-base rounded-lg styled-input w-full"
+              >
+                <option value="1" selected>1 Runde</option>
+                <option value="2">2 Runden</option>
+                <option value="3">3 Runden</option>
+                <option value="4">4 Runden</option>
+                <option value="5">5 Runden</option>
+              </select>
+
+              <button
+                id="createLobbyBtn"
+                class="py-3 px-4 text-lg rounded-lg bg-blue-600 text-white styled-button font-bold shadow-lg hover:shadow-xl"
+              >
+                Lobby erstellen
+              </button>
+            </div>
+
+            <div class="flex items-center justify-center my-3">
+              <span class="text-gray-400 text-lg">ODER</span>
+            </div>
+
+            <div
+              class="flex flex-col gap-5 p-5 bg-[#2A1A59] bg-opacity-70 rounded-xl shadow-inner border border-[#4B3A9D]"
+            >
+              <h3 class="text-xl font-semibold text-[#C5B8FF]">Lobby beitreten</h3>
+              <label
+                for="lobbyCodeInput"
+                class="font-semibold text-lg text-[#E0E0E0]"
+                >Lobby-Code eingeben:</label
+              >
+              <input
+                type="text"
+                id="lobbyCodeInput"
+                placeholder="Z.B. ABCDEF"
+                maxlength="6"
+                class="p-3 text-base rounded-lg styled-input w-full uppercase tracking-widest text-center"
+              />
+
+              <button
+                id="joinLobbyBtn"
+                class="py-3 px-4 text-lg rounded-lg bg-blue-600 text-white styled-button font-bold shadow-lg hover:shadow-xl"
+              >
+                Lobby beitreten
+              </button>
+            </div>
+          </section>
+
+          <section
+            id="lobbyInfoSection"
+            class="hidden flex flex-col gap-5 bg-[#2A1A59] bg-opacity-70 p-5 rounded-xl shadow-inner mt-5 border border-[#4B3A9D] relative"
+          >
+            <p class="text-xl font-semibold mb-3 text-center pt-10 text-[#E0E0E0]">
+              Lobby-Code:
+              <strong id="lobbyCode" class="text-[#C5B8FF] tracking-wider"></strong>
+            </p>
+            <p class="text-lg mb-2 text-[#E0E0E0]">Spieler in der Lobby:</p>
+            <ul
+              id="lobbyPlayers"
+              class="list-disc list-inside mb-4 text-[#E0E0E0]"
+            ></ul>
+
+            <div id="lobbySettingsDisplay" class="flex flex-col gap-2 mb-4">
+              <p class="text-lg text-[#E0E0E0]">
+                <span class="font-semibold">Spieleranzahl:</span>
+                <span id="displayPlayerCount"></span>
+              </p>
+              <p class="text-lg text-[#E0E0E0]">
+                <span class="font-semibold">Zeichenzeit pro Runde:</span>
+                <span id="displayRoundDuration"></span>
+              </p>
+              <p class="text-lg text-[#E0E0E0]">
+                <span class="font-semibold">Anzahl der Runden:</span>
+                <span id="displayMaxRounds"></span>
+              </p>
+            </div>
+
+            <div
+              class="flex flex-col md:flex-row gap-4 justify-between items-center"
+            >
+              <button
+                id="leaveLobbyBtn"
+                class="py-3 px-4 text-lg rounded-lg bg-red-600 text-white styled-button font-bold shadow-lg hover:shadow-xl flex-1"
+              >
+                Lobby verlassen
+              </button>
+              <button
+                id="startGameBtn"
+                disabled
+                class="py-3 px-4 text-lg rounded-lg bg-green-500 text-white styled-button font-bold shadow-lg hover:shadow-xl flex-1"
+              >
+                Lobby erstellen
+              </button>
+            </div>
+          </section>
+
+          <section id="game" class="hidden flex flex-col gap-4">
+            <div
+              id="task"
+              class="text-xl text-center p-4 bg-[#1F1B38] bg-opacity-80 rounded-lg select-none shadow-md text-[#C5B8FF]"
+            >
+              Warte auf die nächste Aufgabe...
+            </div>
+            <div
+              id="timer"
+              class="font-bold text-3xl text-center text-[#C5B8FF] animate-pulse"
+            >
+              00:00
+            </div>
+
+            <div
+              id="canvas-container"
+              class="bg-[#2A1A59] rounded-xl shadow-lg relative aspect-w-16 aspect-h-9 w-full border border-[#4B3A9D]"
+            >
+              <canvas
+                id="drawCanvas"
+                class="block bg-white rounded-xl w-full h-full touch-none"
+              ></canvas>
+              <div
+                id="drawingOverlay"
+                class="hidden absolute inset-0 bg-red-600 bg-opacity-100 flex flex-col items-center justify-center rounded-xl text-black text-center p-4 z-10"
+              >
+                <p class="text-2xl font-bold mb-4 drawing-overlay-text">Die Zeit ist vorbei.</p>
+                <p class="text-xl drawing-overlay-text">
+                  Bitte drücke auf „Fertig“, um deine Zeichnung zu speichern.
+                </p>
+              </div>
+            </div>
+
+            <div
+              id="tools"
+              class="flex flex-wrap gap-4 justify-center bg-[#2A1A59] bg-opacity-70 p-4 rounded-lg shadow-inner border border-[#4B3A9D]"
+            >
+              <div class="flex items-center gap-2">
+                <label for="stroke-size" class="font-semibold text-[#E0E0E0]"
+                  >Stiftgröße:</label
+                >
+                <input
+                  type="range"
+                  id="stroke-size"
+                  min="1"
+                  max="30"
+                  value="5"
+                  aria-label="Stiftgröße ändern"
+                  class="w-32 accent-[#7B4DFF] cursor-pointer"
+                />
+              </div>
+
+              <button
+                id="eraserBtn"
+                aria-pressed="false"
+                class="tool-button py-2 px-4 font-semibold rounded-lg select-none styled-button bg-gray-700 text-white shadow-md"
+              >
+                Radiergummi
+              </button>
+              <button
+                id="fillBucketBtn"
+                aria-pressed="false"
+                class="tool-button py-2 px-4 font-semibold rounded-lg select-none styled-button bg-gray-700 text-white shadow-md"
+              >
+                Farbeimer
+              </button>
+              <button
+                id="clearBtn"
+                class="py-2 px-4 font-semibold rounded-lg select-none styled-button bg-gray-700 text-white shadow-md"
+              >
+                Zeichnung löschen
+              </button>
+              <button
+                id="doneBtn"
+                class="py-2 px-4 font-semibold rounded-lg select-none styled-button bg-green-500 text-white shadow-md"
+              >
+                Fertig!
+              </button>
+
+              <button
+                id="undoBtn"
+                disabled
+                aria-label="Rückgängig"
+                class="py-2 px-4 font-semibold rounded-lg select-none styled-button bg-gray-500 text-white shadow-md"
+              >
+                <i class="fas fa-undo"></i>
+              </button>
+              <button
+                id="redoBtn"
+                disabled
+                aria-label="Wiederherstellen"
+                class="py-2 px-4 font-semibold rounded-lg select-none styled-button bg-gray-500 text-white shadow-md"
+              >
+                <i class="fas fa-redo"></i>
+              </button>
+              <div id="colors" class="flex flex-wrap gap-2 justify-center">
+                <div
+                  class="color-swatch selected"
+                  style="background-color: black"
+                  data-color="#000000"
+                  title="Schwarz"
+                ></div>
+                <div
+                  class="color-swatch"
+                  style="background-color: red"
+                  data-color="#ff0000"
+                  title="Rot"
+                ></div>
+                <div
+                  class="color-swatch"
+                  style="background-color: blue"
+                  data-color="#0000ff"
+                  title="Blau"
+                ></div>
+                <div
+                  class="color-swatch"
+                  style="background-color: green"
+                  data-color="#008000"
+                  title="Grün"
+                ></div>
+                <div
+                  class="color-swatch"
+                  style="background-color: orange"
+                  data-color="#ffa500"
+                  title="Orange"
+                ></div>
+                <div
+                  class="color-swatch"
+                  style="background-color: purple"
+                  data-color="#800080"
+                  title="Lila"
+                ></div>
+                <div
+                  class="color-swatch"
+                  style="background-color: brown"
+                  data-color="#8b4513"
+                  title="Braun"
+                ></div>
+                <div
+                  class="color-swatch"
+                  style="background-color: pink"
+                  data-color="#ff69b4"
+                  title="Pink"
+                ></div>
+
+                <div class="flex items-center gap-1">
+                  <label
+                    for="colorPickerInput"
+                    class="font-semibold text-sm text-[#E0E0E0]"
+                    >Alle Farben:</label
+                  >
+                  <input
+                    type="color"
+                    id="colorPickerInput"
+                    value="#000000"
+                    title="Wähle eine beliebige Farbe"
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <div
+      id="secretWordModal"
+      class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fade-in"
+    >
+      <div
+        class="bg-[#1F1B38] p-6 rounded-lg shadow-xl text-[#E0E0E0] max-w-sm w-full text-center transform scale-95 animate-scale-in border border-[#4B3A9D]"
+      >
+        <h3 class="text-2xl font-bold mb-4 text-[#C5B8FF]">Dein Zeichen-Begriff</h3>
+        <p id="secretWordMessage" class="text-lg mb-4"></p>
+        <input
+          type="text"
+          id="secretWordInput"
+          placeholder="Gib deinen Begriff ein"
+          class="p-3 text-base rounded-md styled-input w-full mb-4"
+        />
+        <div class="flex flex-col gap-2 mb-4">
+          <button
+            id="suggestWordBtn"
+            class="py-2 px-4 text-sm rounded-lg bg-purple-600 text-white styled-button font-bold shadow-md hover:shadow-lg"
+          >
+            ✨ Begriff vorschlagen
+          </button>
+          <div id="wordSuggestions" class="flex flex-wrap gap-2 justify-center">
+            </div>
+        </div>
+        <button
+          id="submitSecretWordBtn"
+          class="w-full py-3 px-4 text-lg rounded-lg bg-blue-600 text-white styled-button font-bold shadow-lg hover:shadow-xl"
+        >
+          Zeichnen starten
+        </button>
+      </div>
+    </div>
+
+    <div
+      id="messageBox"
+      class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 animate-fade-in"
+    >
+      <div
+        class="bg-[#1F1B38] p-6 rounded-lg shadow-xl text-[#E0E0E0] max-w-sm text-center transform scale-95 animate-scale-in border border-[#4B3A9D]"
+      >
+        <p id="messageBoxContent" class="text-lg mb-4"></p>
+        <button
+          class="bg-blue-600 text-white py-2 px-4 rounded-lg styled-button hover:bg-blue-700"
+          onclick="document.getElementById('messageBox').classList.add('hidden')"
+        >
+          OK
+        </button>
+      </div>
+    </div>
+
+    <script type="module">
+      // Firebase imports
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+      import {
+        getAuth,
+        signInAnonymously,
+        onAuthStateChanged,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+      import {
+        getFirestore,
+        doc,
+        getDoc,
+        setDoc,
+        updateDoc,
+        onSnapshot,
+        serverTimestamp, // Import serverTimestamp
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+      // Your Firebase configuration (taken from zaza.txt)
+      const firebaseConfig = {
+        apiKey: "AIzaSyCnPUmueGuFTYYaQ0HXC5ywUOWtDZrU5gA",
+        authDomain: "drawfromyourmemorys.firebaseapp.com",
+        projectId: "drawfromyourmemorys",
+        storageBucket: "drawfromyourmemorys.appspot.com", // CORRECTION: .appspot.com
+        messagingSenderId: "502653705766",
+        appId: "1:502653705766:web:255c0ff77a44589c9790e7",
+        measurementId: "G-L3GXDQGBKZ",
+      };
+
+      let app;
+      let db;
+      let auth;
+      let userId = "anonymous"; // Default until authenticated
+      let isAuthReady = false;
+      let firebaseInitializedSuccessfully = false; // Flag for successful initialization
+
+      console.log("Firebase Konfiguration:", firebaseConfig);
+
+      // Initialize Firebase and authenticate
+      if (
+        firebaseConfig.apiKey &&
+        firebaseConfig.apiKey !== "YOUR_API_KEY" &&
+        firebaseConfig.projectId &&
+        firebaseConfig.projectId !== "YOUR_PROJECT_ID"
+      ) {
+        try {
+          app = initializeApp(firebaseConfig);
+          db = getFirestore(app);
+          auth = getAuth(app);
+
+          onAuthStateChanged(auth, (user) => {
+            if (user) {
+              userId = user.uid;
+              document.getElementById(
+                "currentUserId"
+              ).textContent = `Deine ID: ${userId}`;
+              document
+                .getElementById("currentUserId")
+                .classList.remove("text-red-400");
+              firebaseInitializedSuccessfully = true;
+              isAuthReady = true;
+              console.log("Firebase: Benutzer authentifiziert:", userId);
+            } else {
+              signInAnonymously(auth)
+                .then((userCredential) => {
+                  userId = userCredential.user.uid;
+                  console.log(
+                    "Firebase: Erfolgreich anonym authentifiziert:",
+                    userId
+                  );
+                  document.getElementById(
+                    "currentUserId"
+                  ).textContent = `Deine ID: ${userId}`;
+                  document
+                    .getElementById("currentUserId")
+                    .classList.remove("text-red-400");
+                  firebaseInitializedSuccessfully = true;
+                  isAuthReady = true;
+                })
+                .catch((error) => {
+                  console.error("Firebase: Fehler bei der anonymen Anmeldung:", error);
+                  window.showMessageBox(
+                    "Fehler bei der Anmeldung. Das Spiel kann nicht gestartet werden. Überprüfe deine Firebase-Regeln und ob die anonyme Anmeldung aktiviert ist."
+                  );
+                  document.getElementById(
+                    "currentUserId"
+                  ).textContent = `Deine ID: (Anmeldefehler!)`;
+                  document
+                    .getElementById("currentUserId")
+                    .classList.add("text-red-400");
+                  isAuthReady = true;
+                });
+            }
+          });
+        } catch (e) {
+          console.error("Firebase: Fehler beim Initialisieren von Firebase:", e);
+          window.showMessageBox(
+            "Firebase konnte nicht initialisiert werden. Bitte überprüfe deine Konfigurationsdaten."
+          );
+          document.getElementById(
+            "currentUserId"
+          ).textContent = `Deine ID: (Init-Fehler!)`;
+          document.getElementById("currentUserId").classList.add("text-red-400");
+        }
+      } else {
+        console.warn(
+          "Firebase: Konfiguration nicht gefunden oder Platzhalter vorhanden. Bitte aktualisiere sie!"
+        );
+        isAuthReady = true;
+        document.getElementById(
+          "currentUserId"
+        ).textContent = `Deine ID: (FEHLER: Firebase nicht konfiguriert!)`;
+        document.getElementById("currentUserId").classList.add("text-red-400");
+      }
+
+      // Global showMessageBox function
+      window.showMessageBox = function (message) {
+        const box = document.getElementById("messageBox");
+        const content = document.getElementById("messageBoxContent");
+        if (box && content) {
+          content.textContent = message;
+          box.classList.remove("hidden");
+        } else {
+          console.error(
+            "MessageBox elements not found, falling back to console:",
+            message
+          );
+        }
+      };
+
+      // Self-executing anonymous function for game logic
+      (() => {
+        // New section elements
+        const nameInputSection = document.getElementById("nameInputSection");
+        const lobbySelectionSection = document.getElementById(
+          "lobbySelectionSection"
+        );
+        const lobbyInfoSection = document.getElementById("lobbyInfoSection");
+        const gameSection = document.getElementById("game");
+
+        // Buttons and Inputs for Name Input Section
+        const playerNameInput = document.getElementById("playerNameInput");
+        const continueBtn = document.getElementById("continueBtn");
+
+        // Buttons and Inputs for Lobby Selection Section
+        // const backToNameInputBtn = document.getElementById("backToNameInputBtn"); // Removed as per request
+        const createLobbyBtn = document.getElementById("createLobbyBtn");
+        const lobbyCodeInput = document.getElementById("lobbyCodeInput");
+        const joinLobbyBtn = document.getElementById("joinLobbyBtn");
+        const playerCountSelect = document.getElementById("playerCount");
+        const roundDurationSelect = document.getElementById(
+          "roundDurationSelect"
+        );
+        const maxRoundsSelect = document.getElementById("maxRoundsSelect");
+
+        // Elements for Lobby Info Section
+        const lobbyCodeEl = document.getElementById("lobbyCode");
+        const lobbyPlayersList = document.getElementById("lobbyPlayers");
+        const displayPlayerCount = document.getElementById("displayPlayerCount");
+        const displayRoundDuration = document.getElementById("displayRoundDuration");
+        const displayMaxRounds = document.getElementById("displayMaxRounds");
+        const startGameBtn = document.getElementById("startGameBtn");
+        const leaveLobbyBtn = document.getElementById("leaveLobbyBtn");
+        // const backToSelectionBtn = document.getElementById("backToSelectionBtn"); // Removed from HTML
+
+
+        const taskEl = document.getElementById("task");
+        const timerEl = document.getElementById("timer");
+        const canvas = document.getElementById("drawCanvas");
+        const ctx = canvas.getContext("2d");
+        const drawingOverlay = document.getElementById("drawingOverlay"); // Get the new overlay
+
+        const strokeSizeInput = document.getElementById("stroke-size");
+        const eraserBtn = document.getElementById("eraserBtn");
+        const fillBucketBtn = document.getElementById("fillBucketBtn");
+        const clearBtn = document.getElementById("clearBtn");
+        const doneBtn = document.getElementById("doneBtn");
+        const colors = document.querySelectorAll("#colors .color-swatch");
+        const colorPickerInput = document.getElementById("colorPickerInput");
+
+        const undoBtn = document.getElementById("undoBtn");
+        const redoBtn = document.getElementById("redoBtn");
+
+        const secretWordModal = document.getElementById("secretWordModal");
+        const secretWordInput = document.getElementById("secretWordInput");
+        const submitSecretWordBtn = document.getElementById(
+          "submitSecretWordBtn"
+        );
+        const secretWordMessage = document.getElementById("secretWordMessage");
+        // Neue Elemente für die Begriffsvorschläge
+        const suggestWordBtn = document.getElementById("suggestWordBtn");
+        const wordSuggestionsDiv = document.getElementById("wordSuggestions");
+
+
+        // Sidebar elements and toggle logic
+        const sidebar = document.getElementById("sidebar");
+        const sidebarToggle = document.getElementById("sidebarToggle");
+        const sidebarHome = document.getElementById("sidebar-home");
+        const sidebarGame = document.getElementById("sidebar-game");
+        const sidebarLobbyInfo = document.getElementById("sidebar-lobby-info");
+        const mainContent = document.querySelector('main'); // Get the main content area
+
+        // Sidebar toggle event listener
+        sidebarToggle.addEventListener("click", () => {
+          sidebar.classList.toggle("open");
+        });
+
+        // Close sidebar when a sidebar item is clicked (for mobile)
+        sidebarHome.addEventListener("click", () => {
+          if (window.innerWidth < 768) { // Only for mobile
+            sidebar.classList.remove("open");
+          }
+          showNameInput(); // Assuming 'home' goes to name input
+        });
+
+        sidebarGame.addEventListener("click", () => {
+          if (window.innerWidth < 768) { // Only for mobile
+            sidebar.classList.remove("open");
+          }
+          // Logic to navigate to game section if game is active, or lobby selection
+          if (gameStarted) {
+            showGame();
+          } else if (currentLobbyCode) {
+            // If in a lobby but game not started, go to lobby info
+            getDoc(lobbyRef).then(docSnap => { // Fetch current data to ensure it's up-to-date
+              if (docSnap.exists()) {
+                showLobbyInfo(docSnap.data());
+              } else {
+                showLobbySelection(); // Lobby doesn't exist, go to selection
+              }
+            }).catch(e => {
+              console.error("Error fetching lobby info for sidebar:", e);
+              showLobbySelection(); // Fallback to selection on error
+            });
+          } else {
+            showLobbySelection();
+          }
+        });
+
+        sidebarLobbyInfo.addEventListener("click", (e) => {
+          // This button is now non-interactive via CSS, but keeping the listener for robustness
+          e.preventDefault(); // Prevent default link behavior
+          if (window.innerWidth < 768) { // Only for mobile
+            sidebar.classList.remove("open");
+          }
+          // Logic to navigate to lobby info if in a lobby, otherwise to lobby selection
+          if (currentLobbyCode) {
+            // Need to fetch current lobby data to pass to showLobbyInfo
+            if (lobbyRef) {
+              getDoc(lobbyRef).then(docSnap => {
+                if (docSnap.exists()) {
+                  showLobbyInfo(docSnap.data());
+                } else {
+                  showLobbySelection(); // Lobby doesn't exist, go to selection
+                }
+              }).catch(e => {
+                console.error("Error fetching lobby info for sidebar:", e);
+                showLobbySelection(); // Fallback to selection on error
+              });
+            } else {
+              showLobbySelection();
+            }
+          } else {
+            showLobbySelection();
+          }
+        });
+
+
+        // Lobby and game variables
+        let currentLobbyCode = "";
+        let lobbyRef = null; // Firestore document reference for the current lobby
+        let unsubscribeLobby = null; // To unsubscribe from Firestore listener
+
+        // Drawing variables
+        let drawing = false;
+        let currentColor = "#000000";
+        let currentStroke = 5;
+        let erasing = false;
+        let filling = false;
+        let lastPos = null;
+
+        // Timer variables for local display
+        let localTimerInterval = null;
+        // let localTimerSeconds = 0; // This will now be derived from drawingStartTime
+
+        // Game state variables (will be synchronized via Firestore)
+        let players = [];
+        let currentPlayerIndex = 0; // Index of the player whose turn it is to set the word
+        let gameStarted = false;
+        let currentTask = ""; // The general task category
+        let secretWord = ""; // The specific word to be drawn for the current turn
+        let playerName = "";
+        let maxRounds = 1; // Default number of rounds (new)
+        let currentRound = 0; // Current round number (new)
+        let timerDuration = 60; // Default, will be updated from lobbyData
+
+        // History for Undo/Redo
+        let canvasHistory = [];
+        let historyPointer = -1;
+        const MAX_HISTORY_SIZE = 20;
+
+        // Flag to ensure startDrawingPhase is called only once per drawing phase
+        let isDrawingPhaseActive = false;
+
+        // Determine if the client is likely a PC (desktop)
+        // This is a simple heuristic and might not be 100% accurate for all devices.
+        const isPCPlayer = !/Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
+        console.log("Client-Gerät: Ist PC-Spieler?", isPCPlayer);
+
+
+        // Utility function for throttling (not used for drawing updates to Firestore anymore, but kept for reference)
+        function throttle(func, delay) {
+          let timeoutId;
+          let lastArgs;
+          let lastThis;
+
+          return function (...args) {
+            lastArgs = args;
+            lastThis = this;
+
+            if (!timeoutId) {
+              timeoutId = setTimeout(() => {
+                func.apply(lastThis, lastArgs);
+                timeoutId = null;
+                lastArgs = null;
+                lastThis = null;
+              }, delay);
+            }
+          };
+        }
+
+        // Example tasks
+        const allTasks = [
+          "Eine Figur aus einem Videospiel",
+          "Ein Anime-Charakter, den du gefeiert hast",
+          "Ein Film-Bösewicht, den man sofort erkennt",
+          "Eine Figur aus deiner Kindheit",
+          "Ein Charakter aus einer Cartoon-Serie",
+          "Ein Superheld oder eine Superheldin",
+          "Eine Figur aus einem Disney-Film",
+          "Ein Star Wars-Charakter",
+          "Ein Charakter, der in Memes vorkommt",
+          "Ein Charakter aus einer Sitcom oder Comedy-Serie",
+          "Eine bekannte Figur aus einem Anime-Film",
+          "Ein Bösewicht aus einem Zeichentrickfilm",
+          "Ein alter Videospiel-Charakter (z. B. aus der Gameboy-Ära)",
+          "Eine Figur, die du als Kind nachgeahmt hast",
+          "Ein Charakter, der oft in Halloween-Kostümen vorkommt",
+          "Ein Charakter, der nur Unsinn macht",
+          "Ein Charakter aus einer berühmten Filmreihe",
+          "Eine Figur, die fast jeder kennt",
+          "Eine Figur, die ständig schreit",
+          "Eine Figur, die immer ruhig bleibt",
+          "Eine Figur, die ein Tier ist",
+          "Ein Sidekick aus einem Film oder Spiel",
+          "Ein Charakter, der oft verliert",
+          "Eine Figur mit Superkräften",
+          "Eine Figur mit Brille",
+          "Eine Figur mit auffälligem Outfit",
+          "Ein Charakter, der oft tanzt",
+          "Eine Figur, die du früher gehasst hast",
+          "Eine Figur, die du heute noch magst",
+          "Ein Roboter-Charakter",
+          "Ein bekannter Zauberer oder eine Hexe",
+          "Eine Figur mit berühmtem Spruch",
+          "Eine Figur, die immer isst",
+          "Ein Sport-Charakter (z. B. aus einem Sportspiel)",
+          "Eine Figur, die fliegen kann",
+          "Eine Figur, die in einem Film stirbt",
+          "Eine Figur mit zwei Persönlichkeiten",
+          "Eine Figur aus einem Mario-Spiel",
+          "Eine Figur aus Pokémon",
+          "Ein Charakter, der oft wütend ist",
+          "Eine Figur aus einer Serie, die du früher geschaut hast",
+          "Eine Figur aus einem DreamWorks-Film",
+          "Ein Charakter mit tierischen Merkmalen",
+          "Ein Charakter aus einem Fighting Game",
+          "Ein Charakter mit auffälliger Stimme",
+          "Eine Figur aus dem Marvel-Universum",
+          "Eine Figur aus dem DC-Universum",
+          "Ein Charakter, der in einem Musical mitspielt",
+          "Eine Figur, die in mehreren Spielen/Filmen vorkommt",
+        ];
+
+        // --- View Management Functions ---
+        function showNameInput() {
+          nameInputSection.classList.remove("hidden");
+          lobbySelectionSection.classList.add("hidden");
+          lobbyInfoSection.classList.add("hidden");
+          gameSection.classList.add("hidden"); // Ensure game section is hidden
+          playerNameInput.disabled = false;
+          // playerNameInput.value = ''; // Don't clear name, user might want to keep it
+          console.log("Anzeige: Namenseingabe");
+          updateSidebarActiveItem("sidebar-home");
+          isDrawingPhaseActive = false; // Reset flag
+
+          // Sidebar anzeigen
+          sidebar.style.transform = ""; // Zeigt die Sidebar an
+          sidebarToggle.classList.remove("hidden"); // Zeigt den Toggle-Button an
+          mainContent.classList.remove("md:ml-0"); // Entfernt den linken Rand für Desktop
+          mainContent.classList.add("md:ml-72"); // Setzt den linken Rand für Desktop
+
+          // Sicherstellen, dass Canvas und Tools ausgeblendet sind
+          canvas.style.display = "none";
+          document.getElementById("tools").style.display = "none";
+        }
+
+        function showLobbySelection() {
+          nameInputSection.classList.add("hidden");
+          lobbySelectionSection.classList.remove("hidden");
+          lobbyInfoSection.classList.add("hidden");
+          gameSection.classList.add("hidden"); // Ensure game section is hidden
+          playerNameInput.disabled = true; // Name ist gesetzt, Eingabe deaktivieren
+          lobbyCodeInput.value = ""; // Lobby-Code-Eingabe löschen
+          createLobbyBtn.disabled = false;
+          joinLobbyBtn.disabled = false;
+          lobbyCodeInput.disabled = false;
+          playerCountSelect.disabled = false;
+          roundDurationSelect.disabled = false;
+          maxRoundsSelect.disabled = false;
+          console.log("Anzeige: Lobby-Auswahl");
+          updateSidebarActiveItem("sidebar-game");
+          isDrawingPhaseActive = false; // Reset flag
+
+          // Sidebar anzeigen
+          sidebar.style.transform = ""; // Zeigt die Sidebar an
+          sidebarToggle.classList.remove("hidden"); // Zeigt den Toggle-Button an
+          mainContent.classList.remove("md:ml-0"); // Entfernt den linken Rand für Desktop
+          mainContent.classList.add("md:ml-72"); // Setzt den linken Rand für Desktop
+
+          // Sicherstellen, dass Canvas und Tools ausgeblendet sind
+          canvas.style.display = "none";
+          document.getElementById("tools").style.display = "none";
+        }
+
+        function showLobbyInfo(lobbyData) {
+          nameInputSection.classList.add("hidden");
+          lobbySelectionSection.classList.add("hidden");
+          lobbyInfoSection.classList.remove("hidden");
+          gameSection.classList.add("hidden"); // Ensure game section is hidden
+
+          // Disable all inputs/buttons from previous sections
+          playerNameInput.disabled = true;
+          createLobbyBtn.disabled = true;
+          joinLobbyBtn.disabled = true;
+          lobbyCodeInput.disabled = true;
+          playerCountSelect.disabled = true;
+          roundDurationSelect.disabled = true;
+          maxRoundsSelect.disabled = true;
+
+          // Update displayed lobby settings
+          displayPlayerCount.textContent = `${lobbyData.maxPlayers} Spieler`;
+          displayRoundDuration.textContent =
+            lobbyData.timerDuration === Infinity
+              ? "Unendlich"
+              : `${lobbyData.timerDuration} Sekunden`;
+          displayMaxRounds.textContent = `${lobbyData.maxRrounds} Runden`;
+
+          console.log("Anzeige: Lobby-Informationen");
+          updateSidebarActiveItem("sidebar-lobby-info");
+          isDrawingPhaseActive = false; // Reset flag
+
+          // Sidebar anzeigen
+          sidebar.style.transform = ""; // Zeigt die Sidebar an
+          sidebarToggle.classList.remove("hidden"); // Zeigt den Toggle-Button an
+          mainContent.classList.remove("md:ml-0"); // Entfernt den linken Rand für Desktop
+          mainContent.classList.add("md:ml-72"); // Setzt den linken Rand für Desktop
+
+          // Sicherstellen, dass Canvas und Tools ausgeblendet sind
+          canvas.style.display = "none";
+          document.getElementById("tools").style.display = "none";
+        }
+
+        function showGame() {
+          nameInputSection.classList.add("hidden");
+          lobbySelectionSection.classList.add("hidden");
+          lobbyInfoSection.classList.add("hidden");
+          gameSection.classList.remove("hidden");
+          // Adjust canvas size after the area is visible
+          setTimeout(resizeCanvas, 50);
+          console.log("Anzeige: Spiel");
+          updateSidebarActiveItem("sidebar-game");
+
+          // Sidebar ausblenden, wenn im Spielmodus
+          sidebar.style.transform = "translateX(-100%)"; // Blendet die Sidebar aus
+          sidebarToggle.classList.add("hidden"); // Blendet den Toggle-Button aus
+          mainContent.classList.remove("md:ml-72"); // Entfernt den linken Rand für Desktop
+          mainContent.classList.add("md:ml-0"); // Setzt keinen linken Rand für Desktop
+
+          // Sicherstellen, dass Canvas und Tools sichtbar sind
+          canvas.style.display = "block";
+          document.getElementById("tools").style.display = "flex";
+        }
+
+        function updateSidebarActiveItem(activeId) {
+          document.querySelectorAll('.sidebar-item').forEach(item => {
+            item.classList.remove('active-section');
+          });
+          const activeItem = document.getElementById(activeId);
+          if (activeItem) {
+            activeItem.classList.add('active-section');
+          }
+        }
+
+
+        // --- Utility Functions ---
+
+        // Generates a 6-digit uppercase lobby code
+        function generateLobbyCode() {
+          const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+          let code = "";
+          for (let i = 0; i < 6; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+          }
+          return code;
+        }
+
+        // Formats time for display
+        function formatTime(sec) {
+          const m = Math.floor(sec / 60);
+          const s = sec % 60;
+          return `${m.toString().padStart(2, "0")}:${s
+            .toString()
+            .padStart(2, "0")}`;
+        }
+
+        // Converts Hex color to RGBA array
+        function hexToRgba(hex) {
+          let r = 0,
+            g = 0,
+            b = 0,
+            a = 255;
+          if (hex.length === 4) {
+            r = parseInt(hex[1] + hex[1], 16);
+            g = parseInt(hex[2] + hex[2], 16);
+            b = parseInt(hex[3] + hex[3], 16);
+          } else if (hex.length === 7) {
+            r = parseInt(hex.substring(1, 3), 16);
+            g = parseInt(hex.substring(3, 5), 16);
+            b = parseInt(hex.substring(5, 7), 16);
+          }
+          return [r, g, b, a];
+        }
+
+        // Compares two RGBA colors with tolerance
+        function colorsMatch(color1, color2, tolerance) {
+          return (
+            Math.abs(color1[0] - color2[0]) <= tolerance &&
+            Math.abs(color1[1] - color2[1]) <= tolerance &&
+            Math.abs(color1[2] - color2[2]) <= tolerance &&
+            Math.abs(color1[3] - color2[3]) <= tolerance
+          );
+        }
+
+        // Flood fill algorithm (improved with tolerances)
+        function floodFill(x, y, replacementColorRgba) {
+          console.log(
+            `Flood fill initiated at (${x}, ${y}) with replacement color: ${replacementColorRgba}`
+          );
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const pixels = imageData.data;
+          const width = canvas.width;
+          const height = canvas.height;
+
+          const startIndex = (Math.floor(y) * width + Math.floor(x)) * 4; // Ensure integer coordinates
+          if (startIndex < 0 || startIndex >= pixels.length) {
+            console.error("Clicked outside canvas bounds for flood fill.");
+            return;
+          }
+
+          let targetColorRgba = [
+            pixels[startIndex],
+            pixels[startIndex + 1],
+            pixels[startIndex + 2],
+            pixels[startIndex + 3],
+          ];
+          console.log(
+            `Initial target color at (${x}, ${y}): ${targetColorRgba}`
+          );
+
+          const pureWhiteRgba = [255, 255, 255, 255];
+          // If the clicked color is very close to pure white, set targetColorRgba to pure white
+          if (colorsMatch(targetColorRgba, pureWhiteRgba, 10)) {
+            targetColorRgba = pureWhiteRgba;
+            console.log(
+              "Adjusted target color to pure white (canvas background)."
+            );
+          } else {
+            console.log("Target color remains as clicked pixel color.");
+          }
+
+          // Stricter check if filling is necessary at all.
+          if (colorsMatch(targetColorRgba, replacementColorRgba, 2)) {
+            console.log(
+              "Target and replacement colors are effectively the same (tolerance 2). No fill needed."
+
+            );
+            return;
+          }
+
+          const queue = [[Math.floor(x), Math.floor(y)]]; // Ensure integer coordinates
+          const visited = new Set();
+          let pixelCount = 0;
+
+          function addPixelToQueue(px, py) {
+            const key = `${px},${py}`;
+            if (
+              px >= 0 &&
+              px < width &&
+              py >= 0 &&
+              py < height &&
+              !visited.has(key)
+            ) {
+              visited.add(key);
+              queue.push([px, py]);
+            }
+          }
+
+          addPixelToQueue(Math.floor(x), Math.floor(y));
+
+          const fillTolerance = 20; // Tolerance for the main fill algorithm
+          console.log(`Using fill tolerance: ${fillTolerance}`);
+
+          while (queue.length > 0) {
+            const [cx, cy] = queue.shift();
+
+            const currentPixelIndex = (cy * width + cx) * 4;
+            if (currentPixelIndex < 0 || currentPixelIndex >= pixels.length)
+              continue;
+
+            const currentPixelColor = [
+              pixels[currentPixelIndex],
+              pixels[currentPixelIndex + 1],
+              pixels[currentPixelIndex + 2],
+              pixels[currentPixelIndex + 3],
+            ];
+
+            if (
+              colorsMatch(currentPixelColor, targetColorRgba, fillTolerance)
+            ) {
+              pixels[currentPixelIndex] = replacementColorRgba[0];
+              pixels[currentPixelIndex + 1] = replacementColorRgba[1];
+              pixels[currentPixelIndex + 2] = replacementColorRgba[2];
+              pixels[currentPixelIndex + 3] = replacementColorRgba[3];
+              pixelCount++;
+
+              addPixelToQueue(cx + 1, cy);
+              addPixelToQueue(cx - 1, cy);
+              addPixelToQueue(cx, cy + 1);
+              addPixelToQueue(cx, cy - 1);
+            }
+          }
+          ctx.putImageData(imageData, 0, 0);
+          console.log(
+            `Filled ${pixelCount} pixels with color ${replacementColorRgba}.`
+          );
+          saveCanvasState();
+        }
+
+        // --- History Functions (Undo/Redo) ---
+        function saveCanvasState() {
+          if (historyPointer < canvasHistory.length - 1) {
+            canvasHistory = canvasHistory.slice(0, historyPointer + 1);
+          }
+          canvasHistory.push(canvas.toDataURL());
+          historyPointer = canvasHistory.length - 1;
+
+          if (canvasHistory.length > MAX_HISTORY_SIZE) {
+            canvasHistory.shift();
+            historyPointer--;
+          }
+          updateUndoRedoButtons();
+          console.log(
+            "Canvas state saved. History size:",
+            canvasHistory.length,
+            "Pointer:",
+            historyPointer
+          );
+        }
+
+        function loadCanvasState(dataURL) {
+          const img = new Image();
+          img.onload = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            console.log("Canvas state loaded.");
+          };
+          img.src = dataURL;
+        }
+
+        undoBtn.addEventListener("click", () => {
+          if (historyPointer > 0) {
+            historyPointer--;
+            loadCanvasState(canvasHistory[historyPointer]);
+            updateUndoRedoButtons();
+            console.log("Undo performed. Pointer:", historyPointer);
+          }
+        });
+
+        redoBtn.addEventListener("click", () => {
+          if (historyPointer < canvasHistory.length - 1) {
+            historyPointer++;
+            loadCanvasState(canvasHistory[historyPointer]);
+            updateUndoRedoButtons();
+            console.log("Redo performed. Pointer:", historyPointer);
+          }
+        });
+
+        function updateUndoRedoButtons() {
+          const isUndoDisabled = historyPointer <= 0;
+          const isRedoDisabled = historyPointer >= canvasHistory.length - 1;
+
+          undoBtn.disabled = isUndoDisabled;
+          redoBtn.disabled = isRedoDisabled;
+
+          // Manage the bg-gray-500 class based on disabled state
+          if (isUndoDisabled) {
+            undoBtn.classList.add("bg-gray-500");
+            undoBtn.classList.remove("bg-gray-700");
+          } else {
+            undoBtn.classList.remove("bg-gray-500");
+            undoBtn.classList.add("bg-gray-700");
+          }
+
+          if (isRedoDisabled) {
+            redoBtn.classList.add("bg-gray-500");
+            redoBtn.classList.remove("bg-gray-700");
+          } else {
+            redoBtn.classList.remove("bg-gray-500");
+            redoBtn.classList.add("bg-gray-700");
+          }
+        }
+
+        // --- Firebase / Lobby Management ---
+
+        // Checks if Firebase is ready before attempting operations
+        function checkFirebaseReady() {
+          if (!firebaseInitializedSuccessfully || !db || !auth) {
+            window.showMessageBox(
+              "Firebase ist nicht korrekt initialisiert. Bitte überprüfe deine Konfiguration und Internetverbindung."
+            );
+            console.error("Firebase nicht bereit. isAuthReady:", isAuthReady, "db:", db, "auth:", auth);
+            return false;
+          }
+          return true;
+        }
+
+        // Event listener for "Weiter" button (Name Input)
+        continueBtn.addEventListener("click", () => {
+          const pName = playerNameInput.value.trim();
+          if (!pName) {
+            window.showMessageBox("Bitte gib deinen Namen ein.");
+            return;
+          }
+          playerName = pName; // Sets the global variable
+          showLobbySelection();
+        });
+
+        // Event listener for "Zurück" button (Lobby Info)
+        // backToSelectionBtn.addEventListener("click", () => { // Removed from HTML
+        //     resetGame(); // This will call showLobbySelection()
+        // });
+
+
+        // Create Lobby
+        createLobbyBtn.addEventListener("click", async () => {
+          if (!checkFirebaseReady()) return;
+
+          // Player name should already be set from the name input view
+          if (!playerName) {
+            window.showMessageBox("Dein Name wurde nicht gesetzt. Bitte gehe zurück und gib ihn ein.");
+            showNameInput();
+            return;
+          }
+
+          const requestedPlayerCount = parseInt(playerCountSelect.value);
+
+          let selectedRoundDuration;
+          if (roundDurationSelect.value === "Infinity") {
+            selectedRoundDuration = Infinity;
+          } else {
+            selectedRoundDuration = parseInt(roundDurationSelect.value);
+          }
+
+          const selectedMaxRounds = parseInt(maxRoundsSelect.value); // New
+
+          currentLobbyCode = generateLobbyCode();
+          
+          // Log the full path and appId
+          const lobbyPath = `artifacts/${firebaseConfig.appId}/public/data/lobbies`;
+          console.log("Firebase: Erstelle Lobby mit appId:", firebaseConfig.appId);
+          console.log("Firebase: Vollständiger Firestore-Pfad für Lobby:", lobbyPath + "/" + currentLobbyCode);
+          console.log("Firebase: Aktueller userId:", userId);
+
+
+          lobbyRef = doc(
+            db,
+            lobbyPath,
+            currentLobbyCode
+          );
+
+          try {
+            const lobbyDataPayload = {
+              hostId: userId,
+              maxPlayers: requestedPlayerCount,
+              players: [
+                {
+                  id: userId,
+                  name: playerName,
+                  secretWord: "",
+                  hasFinishedDrawing: false,
+                  drawingData: null,
+                },
+              ],
+              status: "waiting", // 'waiting', 'in-game', 'showing-turn-results', 'finished'
+              currentPlayerIndex: 0, // Index of the player whose turn it is to set the word
+              gameStarted: false,
+              currentTask: "",
+              secretWord: "", // The word currently being drawn by everyone
+              timerDuration: selectedRoundDuration, // Use the potentially Infinity value
+              drawingStartTime: null, // New: Timestamp for when drawing starts
+              tasksAssigned: [], // To track assigned tasks
+              maxRrounds: selectedMaxRounds, // FIX: Changed from selectedMaxRrounds to selectedMaxRounds
+              currentRound: 0, // Initialize current round to 0, will be 1 on first game start
+              completedRoundsData: [], // Stores completed rounds, each with turns and drawings
+              currentRoundTurnsInProgress: [], // NEW: To store turn results for the current round
+            };
+
+            console.log("Firebase: Sende Payload an Firestore:", lobbyDataPayload);
+
+            await setDoc(lobbyRef, lobbyDataPayload);
+            console.log("Firebase: Lobby erfolgreich erstellt mit Code:", currentLobbyCode);
+            setupLobbyListener();
+            lobbyCodeEl.textContent = currentLobbyCode;
+            // showLobbyInfo is now called by the onSnapshot listener
+            window.showMessageBox(
+              `Lobby '${currentLobbyCode}' erstellt. Warte auf andere Spieler...`
+            );
+          } catch (e) {
+            console.error("Firebase: Fehler beim Erstellen der Lobby:", e);
+            console.error("Firebase: Fehlerdetails:", e.name, e.message, e.code); // Added detailed error logging
+            window.showMessageBox(
+              "Fehler beim Erstellen der Lobby. Bitte versuche es erneut. (Möglicherweise Firebase-Regeln oder Authentifizierungsproblem?)"
+            );
+          }
+        });
+
+        // Join Lobby
+        joinLobbyBtn.addEventListener("click", async () => {
+          if (!checkFirebaseReady()) return;
+
+          // Player name should already be set from the name input view
+          if (!playerName) {
+            window.showMessageBox("Dein Name wurde nicht gesetzt. Bitte gehe zurück und gib ihn ein.");
+            showNameInput();
+            return;
+          }
+
+          const code = lobbyCodeInput.value.trim().toUpperCase();
+          if (code.length !== 6) {
+            window.showMessageBox(
+              "Bitte gib einen gültigen 6-stelligen Lobby-Code ein."
+            );
+            return;
+          }
+
+          const lobbyPath = `artifacts/${firebaseConfig.appId}/public/data/lobbies`;
+          console.log("Firebase: Versuche Lobby beizutreten mit appId:", firebaseConfig.appId);
+          console.log("Firebase: Vollständiger Firestore-Pfad für Lobby:", lobbyPath + "/" + code);
+          console.log("Firebase: Aktueller userId:", userId);
+
+          lobbyRef = doc(
+            db,
+            lobbyPath,
+            code
+          );
+          try {
+            const lobbySnap = await getDoc(lobbyRef);
+            if (lobbySnap.exists()) {
+              const lobbyData = lobbySnap.data();
+              if (
+                lobbyData.status === "waiting" &&
+                lobbyData.players.length < lobbyData.maxPlayers
+              ) {
+                if (!lobbyData.players.some((p) => p.id === userId)) {
+                  // Player objects now store secretWord, hasFinishedDrawing, and drawingData directly
+                  const newPlayers = [
+                    ...lobbyData.players,
+                    {
+                      id: userId,
+                      name: playerName,
+                      secretWord: "",
+                      hasFinishedDrawing: false,
+                      drawingData: null,
+                    },
+                  ];
+                  console.log("Firebase: Aktualisiere Lobby mit neuen Spielern:", newPlayers);
+                  await updateDoc(lobbyRef, { players: newPlayers });
+                  currentLobbyCode = code;
+                  setupLobbyListener();
+                  lobbyCodeEl.textContent = currentLobbyCode;
+                  // showLobbyInfo is now called by the onSnapshot listener
+                  window.showMessageBox(
+                    `Lobby ${code} erfolgreich beigetreten!`
+                  );
+                } else {
+                  window.showMessageBox("Du bist bereits in dieser Lobby.");
+                  currentLobbyCode = code;
+                  setupLobbyListener();
+                  lobbyCodeEl.textContent = currentLobbyCode;
+                  // showLobbyInfo is now called by the onSnapshot listener
+                }
+              } else {
+                window.showMessageBox(
+                  "Diese Lobby ist voll oder das Spiel hat bereits begonnen."
+                );
+              }
+            } else {
+              window.showMessageBox(
+                "Lobby nicht gefunden. Bitte überprüfe den Code."
+              );
+            }
+          } catch (e) {
+            console.error("Firebase: Fehler beim Beitreten der Lobby:", e);
+            console.error("Firebase: Fehlerdetails:", e.name, e.message, e.code); // Added detailed error logging
+            window.showMessageBox(
+              "Fehler beim Beitreten der Lobby. Bitte versuche es erneut. (Möglicherweise Firebase-Regeln oder Authentifizierungsproblem?)"
+            );
+          }
+        });
+
+        // Leave Lobby Button
+        leaveLobbyBtn.addEventListener("click", async () => {
+          if (!checkFirebaseReady() || !lobbyRef) return;
+
+          try {
+            const lobbySnap = await getDoc(lobbyRef);
+            if (lobbySnap.exists()) {
+              const lobbyData = lobbySnap.data();
+              const currentPlayers = lobbyData.players.filter(
+                (p) => p.id !== userId
+              );
+
+              if (currentPlayers.length === 0) {
+                // If no players left, delete the lobby
+                console.log("Firebase: Letzter Spieler verlässt Lobby. Lösche Lobby.");
+                await setDoc(lobbyRef, {}, { merge: false }); // Set to empty to effectively delete
+              } else {
+                // Update players list
+                console.log("Firebase: Spieler verlässt Lobby. Aktualisiere Spielerliste.");
+                await updateDoc(lobbyRef, { players: currentPlayers });
+              }
+            }
+          } catch (e) {
+            console.error("Firebase: Fehler beim Verlassen der Lobby:", e);
+            window.showMessageBox("Fehler beim Verlassen der Lobby.");
+          } finally {
+            resetGame(); // Reset local state and show lobby selection
+          }
+        });
+
+        // Lauscht auf Lobby-Änderungen
+        function setupLobbyListener() {
+          if (unsubscribeLobby) {
+            unsubscribeLobby();
+            console.log("Firebase: Vorheriger Lobby-Listener abgemeldet.");
+          }
+          if (!db) {
+            console.error(
+              "Firebase: Firestore-Datenbank nicht initialisiert. Lobby-Listener kann nicht eingerichtet werden."
+            );
+            return;
+          }
+          console.log("Firebase: Richte Lobby-Listener für Lobby-Ref ein:", lobbyRef.path);
+          unsubscribeLobby = onSnapshot(
+            lobbyRef,
+            (docSnap) => {
+              if (docSnap.exists()) {
+                const lobbyData = docSnap.data();
+                // Ensure players is always an array, even if lobbyData.players is undefined
+                players = lobbyData.players || []; 
+                console.log("Firebase: Firestore lobbyData.players:", lobbyData.players); // Debug: Check incoming players data
+
+                currentPlayerIndex = lobbyData.currentPlayerIndex;
+                gameStarted = lobbyData.gameStarted; // This local variable is updated here
+                currentTask = lobbyData.currentTask;
+                secretWord = lobbyData.secretWord || "";
+                timerDuration = lobbyData.timerDuration || 60; // Update timerDuration from lobby data
+                // maxRounds and currentRound are already handled.
+                const gameStatus = lobbyData.status;
+
+                // Update displayed lobby settings in case they changed (e.g., host changed them)
+                displayPlayerCount.textContent = `${lobbyData.maxPlayers} Spieler`;
+                displayRoundDuration.textContent =
+                    lobbyData.timerDuration === Infinity
+                    ? "Unendlich"
+                    : `${lobbyData.timerDuration} Sekunden`;
+                displayMaxRounds.textContent = `${lobbyData.maxRrounds} Runden`;
+
+                // Update lobby player list
+                lobbyPlayersList.innerHTML = players
+                  .map(
+                    (p) => `<li>${p.name} ${p.id === userId ? "(Du)" : ""}</li>`
+                  )
+                  .join(""); // Only show (Du) for self
+                console.log("Lobby Players List HTML after update:", lobbyPlayersList.innerHTML); // Debug: Check generated HTML
+                console.log("Current players array (local):", players); // Debug: Check local players array
+
+                // Centralized view management based on lobbyData.gameStarted and gameStatus
+                if (lobbyData.gameStarted) {
+                    showGame(); // Always show game section if game has started
+                    updateGameUI(gameStatus, lobbyData.hostId, lobbyData); // Then update game UI based on status
+                } else {
+                    // If game has not started, always show lobby info
+                    showLobbyInfo(lobbyData);
+                    // Handle startGameBtn state and text for lobbyInfoSection
+                    if (lobbyData.hostId === userId) {
+                        if (players.length >= 2) { // Only check player count, not gameStarted here
+                            startGameBtn.disabled = false;
+                            startGameBtn.textContent = "Spiel starten";
+                            startGameBtn.classList.remove(
+                                "bg-gray-500",
+                                "cursor-not-allowed"
+                            );
+                            startGameBtn.classList.add(
+                                "bg-green-500",
+                                "hover:bg-green-600"
+                            );
+                        } else {
+                            startGameBtn.disabled = true;
+                            startGameBtn.textContent = "Warten auf weitere Spieler...";
+                            startGameBtn.classList.remove(
+                                "bg-green-500",
+                                "hover:bg-green-600"
+                            );
+                            startGameBtn.classList.add(
+                                "bg-gray-500",
+                                "cursor-not-allowed"
+                            );
+                        }
+                    } else {
+                        startGameBtn.disabled = true;
+                        startGameBtn.textContent =
+                            "Warten bis der Hoster das Spiel startet";
+                        startGameBtn.classList.remove(
+                            "bg-green-500",
+                            "hover:bg-green-600"
+                        );
+                        startGameBtn.classList.add(
+                            "bg-gray-500",
+                            "cursor-not-allowed"
+                        );
+                    }
+                }
+              } else {
+                console.log("Firebase: Lobby existiert nicht oder wurde gelöscht.");
+                window.showMessageBox(
+                  "Die Lobby wurde geschlossen oder existiert nicht mehr."
+                );
+                resetGame(); // Go back to lobby selection
+              }
+            },
+            (error) => {
+              console.error("Firebase: Fehler beim Abhören der Lobby:", error);
+              window.showMessageBox(
+                "Verbindung zur Lobby verloren. Bitte versuche es erneut."
+              );
+              resetGame(); // Go back to lobby selection
+            }
+          );
+        }
+
+        // Start Game
+        startGameBtn.addEventListener("click", async () => {
+          if (!checkFirebaseReady()) return;
+          if (players.length < 2) {
+            window.showMessageBox(
+              "Es werden mindestens 2 Spieler benötigt, um das Spiel zu starten."
+            );
+            return;
+          }
+          if (lobbyRef) {
+            try {
+              // Reset secretWord, hasFinishedDrawing, and drawingData for all players at the start of the game
+              const initialPlayers = players.map((p) => ({
+                ...p,
+                secretWord: "",
+                hasFinishedDrawing: false,
+                drawingData: null,
+              }));
+              console.log("Firebase: Starte Spiel. Setze initialPlayers und Status.");
+              await updateDoc(lobbyRef, {
+                gameStarted: true,
+                status: "in-game", // Set status to in-game
+                currentPlayerIndex: 0, // Start with the first player setting the word
+                tasksAssigned: [], // To track assigned tasks (reset for new game)
+                players: initialPlayers, // Update players with reset states
+                currentTask: "", // Clear current task
+                secretWord: "", // Clear global secret word
+                drawingStartTime: null, // Ensure no start time is set initially
+                currentRound: 1, // Start at round 1
+                completedRoundsData: [], // Clear completed rounds data for new game
+                currentRoundTurnsInProgress: [], // Clear turns in progress for new game
+              });
+              console.log("Firebase: Spiel in Lobby gestartet.");
+              // showGame() is now called by the onSnapshot listener
+            } catch (e) {
+              console.error("Firebase: Fehler beim Starten des Spiels:", e);
+              window.showMessageBox(
+                "Fehler beim Starten des Spiels. (Möglicherweise Firebase-Regeln?)"
+              );
+            }
+          }
+        });
+
+        // Updates the game UI based on new lobby data
+        function updateGameUI(gameStatus, hostId, lobbyData) {
+          // No need for `if (!gameStarted) return;` here, as this function is only called if game has started.
+
+          const currentPlayerToSetWord = players[currentPlayerIndex];
+          const myPlayerObject = players.find((p) => p.id === userId);
+
+          // Hide overlay by default for new updates
+          drawingOverlay.classList.add("hidden");
+          canvas.style.pointerEvents = "auto"; // Re-enable drawing by default
+          canvas.classList.remove("drawing-active"); // Remove red border by default
+          doneBtn.disabled = false; // Enable done button by default
+          canvas.style.display = "block"; // Sicherstellen, dass Canvas sichtbar ist
+          document.getElementById("tools").style.display = "flex"; // Sicherstellen, dass Tools sichtbar sind
+
+
+          if (gameStatus === "showing-turn-results" || gameStatus === "finished") {
+            // Pass the entire lobbyData to the function
+            showTurnOrRoundResults(hostId, lobbyData);
+            isDrawingPhaseActive = false;
+            if (localTimerInterval) clearInterval(localTimerInterval); // Stop local timer
+            timerEl.textContent = "";
+            canvas.style.pointerEvents = "none"; // Disable drawing during results
+            doneBtn.disabled = true; // Disable done button during results
+            drawingOverlay.classList.add("hidden"); // Ensure hidden
+            canvas.style.display = "none"; // Canvas ausblenden
+            document.getElementById("tools").style.display = "none"; // Tools ausblenden
+            return;
+          }
+
+          // Clear canvas when a new word-setting phase starts (secretWord is empty)
+          if (
+            gameStatus === "in-game" &&
+            !lobbyData.secretWord &&
+            !isDrawingPhaseActive
+          ) {
+            console.log("Game UI: Leere Canvas für neue Wort-Setz-Phase.");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            saveCanvasState();
+            currentColor = "#000000"; // Reset color to black
+            colorPickerInput.value = currentColor; // Sync picker value
+            resetTools(); // Reset tool selection
+            isDrawingPhaseActive = false; // Ensure it's false for word setting
+            drawingOverlay.classList.add("hidden"); // Ensure hidden
+            if (localTimerInterval) clearInterval(localTimerInterval); // Lokalen Timer stoppen
+            timerEl.textContent = "00:00"; // Timer-Anzeige zurücksetzen
+          }
+
+          // Phase 1: Setting the secret word (only for the designated player)
+          if (
+            currentPlayerToSetWord &&
+            currentPlayerToSetWord.id === userId &&
+            !lobbyData.secretWord
+          ) {
+            console.log("Game UI: Aktueller Spieler setzt das Wort.");
+            // Wenn ich an der Reihe bin, das Wort zu setzen, und noch keine Aufgabe zugewiesen ist, wähle eine aus und aktualisiere Firestore
+            if (!lobbyData.currentTask) {
+              const availableTasks = allTasks.filter(
+                (task) => !lobbyData.tasksAssigned.includes(task)
+              ); // Filtert bereits zugewiesene Aufgaben heraus
+              const newTask =
+                availableTasks.length > 0
+                  ? availableTasks[
+                      Math.floor(Math.random() * availableTasks.length)
+                    ]
+                  : allTasks[Math.floor(Math.random() * allTasks.length)];
+
+              // currentTask in Firestore aktualisieren. Dies löst onSnapshot für alle Clients aus.
+              if (lobbyRef) {
+                console.log("Game UI: Host setzt neue Aufgabe:", newTask);
+                updateDoc(lobbyRef, { currentTask: newTask });
+              }
+              taskEl.textContent = `Deine Aufgabe: ${newTask}`;
+              secretWordMessage.textContent = `Was möchtest du zu "${newTask}" zeichnen?`;
+            } else {
+              // Wenn die Aufgabe für diese Runde bereits in Firestore existiert, diese verwenden
+              taskEl.textContent = `Deine Aufgabe: ${lobbyData.currentTask}`;
+              secretWordMessage.textContent = `Was möchtest du zu "${lobbyData.currentTask}" zeichnen?`;
+            }
+            secretWordInput.value = ""; // Eingabefeld für neuen Begriff leeren
+            secretWordModal.classList.remove("hidden");
+            canvas.style.pointerEvents = "none"; // Canvas deaktivieren, während das Wort festgelegt wird
+            canvas.classList.remove("drawing-active");
+            doneBtn.disabled = true; // "Fertig"-Taste in dieser Phase deaktiviert
+            suggestWordBtn.disabled = false; // Vorschlagen-Button aktivieren
+            wordSuggestionsDiv.innerHTML = ''; // Vorschläge leeren
+            if (localTimerInterval) clearInterval(localTimerInterval); // Lokalen Timer stoppen
+            timerEl.textContent = "00:00"; // Timer-Anzeige zurücksetzen
+            drawingOverlay.classList.add("hidden"); // Sicherstellen, dass Overlay ausgeblendet ist
+            canvas.style.display = "block"; // Canvas sichtbar lassen, aber deaktiviert
+            document.getElementById("tools").style.display = "flex"; // Tools sichtbar lassen, aber deaktiviert
+
+            isDrawingPhaseActive = false; // Sicherstellen, dass die Zeichenphase noch nicht aktiv ist
+          }
+          // Phase 2: Zeichnen (für alle Spieler, sobald secretWord festgelegt ist)
+          else if (lobbyData.secretWord) {
+            secretWordModal.classList.add("hidden");
+            taskEl.textContent = `Zeichne: ${lobbyData.secretWord}`; // Das geheime Wort anzeigen
+
+            // Überprüfen, ob dies eine neue Zeichenphase für den aktuellen Benutzer ist
+            // und ob der Benutzer seine Zeichnung noch nicht beendet hat
+            if (myPlayerObject && !myPlayerObject.hasFinishedDrawing && !isDrawingPhaseActive) {
+                console.log("Game UI: Starte Zeichenphase für neuen Begriff.");
+                startDrawingPhase(); // Diese Funktion löscht das Canvas und setzt den Anfangszustand
+                isDrawingPhaseActive = true; // Zeichenphase für diesen Client als aktiv markieren
+            }
+
+            // Wenn die Timer-Dauer unendlich ist, Unendlich-Symbol anzeigen und Zeichnen aktivieren
+            if (lobbyData.timerDuration === Infinity) {
+                timerEl.textContent = "∞";
+                canvas.style.pointerEvents = "auto";
+                canvas.classList.add("drawing-active");
+                drawingOverlay.classList.add("hidden");
+                doneBtn.disabled = players.find(p => p.id === userId)?.hasFinishedDrawing;
+                if (localTimerInterval) clearInterval(localTimerInterval); // Vorhandenes Intervall stoppen
+                console.log("Game UI: Timer auf Unendlich gesetzt.");
+            } else {
+                // Lokalen visuellen Timer basierend auf dem Server-Timestamp starten oder aktualisieren
+                const drawingStartTime = lobbyData.drawingStartTime?.toDate();
+                if (drawingStartTime) {
+                    console.log("Game UI: Timer: drawingStartTime von Firestore:", drawingStartTime);
+                    console.log("Game UI: Timer: aktuelle timerDuration:", lobbyData.timerDuration);
+                    
+                    let effectiveDuration = lobbyData.timerDuration;
+                    // Wenn der Spieler ein PC-Spieler ist und die Dauer nicht unendlich ist, 10 Sekunden abziehen
+                    if (isPCPlayer && effectiveDuration !== Infinity) {
+                        effectiveDuration = Math.max(0, effectiveDuration - 10);
+                        console.log("Game UI: Timer: PC-Spieler (-10s). Effektive Dauer:", effectiveDuration);
+                    } else {
+                        console.log("Game UI: Timer: Kein PC-Spieler oder unendliche Dauer. Effektive Dauer:", effectiveDuration);
+                    }
+
+
+                    startSynchronizedVisualTimer(drawingStartTime, effectiveDuration);
+                } else {
+                    // Wenn secretWord gesetzt ist, aber drawingStartTime noch nicht verfügbar ist, warte darauf.
+                    console.warn("Game UI: drawingStartTime nicht verfügbar, warte auf Synchronisation.");
+                    timerEl.textContent = "Synchronisiere Timer..."; // Zeigt den Wartezustand an
+                    canvas.style.pointerEvents = "none"; // Zeichenfunktion deaktivieren, bis der Timer bereit ist
+                    canvas.classList.remove("drawing-active");
+                    doneBtn.disabled = true;
+                    drawingOverlay.classList.add("hidden"); // Sicherstellen, dass ausgeblendet
+                    if (localTimerInterval) clearInterval(localTimerInterval); // Vorhandenes Intervall stoppen
+                }
+            }
+            
+            // Vorschlagen-Button und Vorschläge ausblenden
+            suggestWordBtn.disabled = true;
+            wordSuggestionsDiv.innerHTML = '';
+
+
+            // Überprüfen, ob die aktuelle Zeichenphase für dieses Wort beendet ist (alle Spieler fertig)
+            const allPlayersFinishedDrawingForCurrentWord = players.every(
+              (p) => p.hasFinishedDrawing
+            );
+            if (allPlayersFinishedDrawingForCurrentWord) {
+              console.log(
+                `Game UI: Alle Spieler haben das Zeichnen für das geheime Wort "${lobbyData.secretWord}" beendet.`
+              );
+              if (hostId === userId) {
+                console.log("Game UI: Host löst endDrawingPhase aus.");
+                endDrawingPhase();
+              } else {
+                console.log(
+                  "Game UI: Nicht-Host-Client hat erkannt, dass alle Spieler fertig sind, wartet auf den Host zum Übergang."
+                );
+                canvas.style.pointerEvents = "none";
+                doneBtn.disabled = true; // "Fertig"-Taste deaktivieren, wenn alle Spieler fertig sind und auf den Host warten
+                if (localTimerInterval) clearInterval(localTimerInterval); // Lokalen Timer stoppen
+                drawingOverlay.classList.add("hidden"); // Sicherstellen, dass Overlay ausgeblendet ist
+              }
+            }
+          }
+          // Phase 3: Warten auf geheimes Wort (für Spieler, die das Wort nicht festlegen)
+          else {
+            console.log("Game UI: Warte auf geheimes Wort.");
+            secretWordModal.classList.add("hidden");
+            canvas.style.pointerEvents = "none";
+            canvas.classList.remove("drawing-active");
+            doneBtn.disabled = true;
+            suggestWordBtn.disabled = true; // Vorschlagen-Button deaktivieren
+            wordSuggestionsDiv.innerHTML = ''; // Vorschläge leeren
+            drawingOverlay.classList.add("hidden"); // Sicherstellen, dass Overlay ausgeblendet ist
+            if (currentPlayerToSetWord) {
+              taskEl.textContent = `Warte auf ${
+                currentPlayerToSetWord.name
+              } zum Setzen des Begriffs. Aufgabe: ${
+                lobbyData.currentTask || "Wird geladen..."
+              }`;
+            } else {
+              taskEl.textContent = "Warte auf die nächste Runde...";
+            }
+            if (localTimerInterval) clearInterval(localTimerInterval); // Lokalen Timer stoppen
+            timerEl.textContent = "00:00"; // Timer-Anzeige zurücksetzen
+            isDrawingPhaseActive = false; // Flag zurücksetzen, da die Zeichenphase nicht aktiv ist
+          }
+        }
+
+        // --- New function to update visual timer and apply effects ---
+        function startSynchronizedVisualTimer(startTime, duration) {
+          if (localTimerInterval) clearInterval(localTimerInterval); // Clear any existing interval
+
+          const endTime = startTime.getTime() + duration * 1000; // Calculate end time based on server start time
+          console.log("Timer: Calculated End Time (ms):", endTime);
+
+          const updateDisplay = () => {
+            const now = Date.now();
+            let remainingSeconds = Math.max(0, Math.floor((endTime - now) / 1000));
+            console.log(`Timer: Now (ms): ${now}, Remaining (s): ${remainingSeconds}`); // Added for debugging
+
+            timerEl.textContent = formatTime(remainingSeconds); // Update timer display
+
+            if (remainingSeconds <= 0) {
+              clearInterval(localTimerInterval);
+              localTimerInterval = null;
+              console.log("Timer: Lokaler Timer hat Null erreicht. Wende End-Effekte an.");
+              // Apply local timer-end effects
+              canvas.style.pointerEvents = "none"; // Disable drawing
+              canvas.classList.remove("drawing-active"); // Remove active border
+              drawingOverlay.classList.remove("hidden"); // Show red overlay
+              doneBtn.disabled = false; // IMPORTANT: Keep done button enabled
+              taskEl.textContent = `Die Zeit ist vorbei. Bitte drücke auf „Fertig“, um deine Zeichnung zu speichern.`; // Update task message
+            } else {
+              // Ensure drawing is enabled and overlay is hidden if time is still running
+              canvas.style.pointerEvents = "auto";
+              canvas.classList.add("drawing-active");
+              drawingOverlay.classList.add("hidden");
+              // Re-evaluate done button state based on player's finished status
+              doneBtn.disabled = players.find(p => p.id === userId)?.hasFinishedDrawing;
+            }
+          };
+
+          updateDisplay(); // Call immediately to set initial state
+          localTimerInterval = setInterval(updateDisplay, 1000); // Update every second
+        }
+
+        // Submit secret word
+        submitSecretWordBtn.addEventListener("click", async () => {
+          if (!checkFirebaseReady()) return;
+          const word = secretWordInput.value.trim();
+          if (word.length > 0) {
+            try {
+              const lobbySnap = await getDoc(lobbyRef);
+              let currentPlayers = [...lobbySnap.data().players];
+              const playerIndex = currentPlayers.findIndex(
+                (p) => p.id === userId
+              );
+
+              if (playerIndex !== -1) {
+                currentPlayers[playerIndex].secretWord = word;
+                // Reset drawing status for all players for the new word
+                currentPlayers = currentPlayers.map((p) => ({
+                  ...p,
+                  hasFinishedDrawing: false,
+                  drawingData: null,
+                }));
+
+                console.log("Firebase: Spieler setzt geheimes Wort. Aktualisiere Lobby.");
+                await updateDoc(lobbyRef, {
+                  secretWord: word, // Update global secret word for this turn
+                  players: currentPlayers, // Update players with the secret word and reset drawing status
+                  drawingStartTime: serverTimestamp(), // Set server timestamp when drawing starts
+                });
+
+                secretWordModal.classList.add("hidden");
+                // onSnapshot will trigger updateGameUI, which then calls startDrawingPhase for all clients.
+              }
+            } catch (e) {
+              console.error("Firebase: Fehler beim Aktualisieren des geheimen Wortes:", e);
+              window.showMessageBox("Fehler beim Speichern des Begriffs.");
+            }
+          } else {
+            window.showMessageBox("Bitte gib einen Begriff ein.");
+          }
+        });
+
+        // --- Gemini API Integration for Word Suggestions ---
+        suggestWordBtn.addEventListener("click", async () => {
+          if (!checkFirebaseReady()) return;
+
+          const currentTaskCategory = currentTask; // Use the task from the game state
+          if (!currentTaskCategory) {
+            window.showMessageBox("Keine Aufgabenkategorie zum Vorschlagen von Begriffen verfügbar.");
+            return;
+          }
+
+          suggestWordBtn.disabled = true;
+          suggestWordBtn.textContent = "Vorschläge werden geladen...";
+          wordSuggestionsDiv.innerHTML = ''; // Clear previous suggestions
+
+          try {
+            const prompt = `Gib mir 3 bekannte Beispiele für die Kategorie: "${currentTaskCategory}". Antworte als JSON-Array von Strings, zum Beispiel: ["Beispiel1", "Beispiel2", "Beispiel3"].`;
+            
+            const payload = {
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "ARRAY",
+                        items: { "type": "STRING" }
+                    }
+                }
+            };
+            const apiKey = "AIzaSyA4BDPFC2T9cNJ75EYYJsAnUW-Xzjk3OkE"; // API-Schlüssel wird von Canvas zur Laufzeit bereitgestellt
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+            
+            if (result.candidates && result.candidates.length > 0 &&
+                result.candidates[0].content && result.candidates[0].content.parts &&
+                result.candidates[0].content.parts.length > 0) {
+                const jsonText = result.candidates[0].content.parts[0].text;
+                const suggestions = JSON.parse(jsonText);
+
+                if (Array.isArray(suggestions) && suggestions.length > 0) {
+                    wordSuggestionsDiv.innerHTML = ''; // Clear previous suggestions
+                    suggestions.forEach(word => {
+                        const btn = document.createElement("button");
+                        btn.textContent = word;
+                        btn.className = "suggestion-button py-2 px-3 rounded-lg text-sm";
+                        btn.onclick = () => {
+                            secretWordInput.value = word;
+                            wordSuggestionsDiv.innerHTML = ''; // Clear suggestions after selection
+                        };
+                        wordSuggestionsDiv.appendChild(btn);
+                    });
+                } else {
+                    wordSuggestionsDiv.textContent = "Keine Vorschläge gefunden.";
+                }
+            } else {
+                console.error("Gemini API: Unerwartete Antwortstruktur von Gemini API:", result);
+                window.showMessageBox("Fehler beim Abrufen von Vorschlägen: Unerwartete Antwort.");
+            }
+          } catch (e) {
+            console.error("Gemini API: Fehler beim Aufruf der Gemini API:", e);
+            window.showMessageBox("Fehler beim Abrufen von Vorschlägen. Bitte versuche es später noch einmal.");
+          } finally {
+            suggestWordBtn.disabled = false;
+            suggestWordBtn.textContent = "✨ Begriff vorschlagen";
+          }
+        });
+
+
+        // --- Drawing Logic ---
+
+        // Get pointer position relative to canvas
+        function getPointerPos(evt) {
+          const rect = canvas.getBoundingClientRect();
+          let clientX, clientY;
+          if (evt.touches && evt.touches.length > 0) {
+            clientX = evt.touches[0].clientX;
+            clientY = evt.touches[0].clientY;
+          } else {
+            clientX = evt.clientX;
+            clientY = evt.clientY;
+          }
+          return {
+            x: clientX - rect.left,
+            y: clientY - rect.top,
+          };
+        }
+
+        function handleCanvasStart(evt) {
+          console.log("Canvas: handleCanvasStart ausgelöst. Ereignistyp:", evt.type);
+          console.log("Canvas: Aktueller Füllzustand:", filling); // Log hinzugefügt
+          // Zeichnen erlauben, wenn das Spiel gestartet und das geheime Wort festgelegt ist (kollaboratives Zeichnen)
+          if (!gameStarted || !secretWord) {
+            console.log(
+              "Canvas: Canvas-Interaktion durch Bedingung verhindert (Spiel nicht gestartet oder Geheimwort fehlt)."
+            );
+            return;
+          }
+          evt.preventDefault();
+
+          const pos = getPointerPos(evt);
+          console.log(`Canvas: Zeigerposition für Start: (${pos.x}, ${pos.y})`); // Log hinzugefügt
+
+          if (filling) {
+            const replacementColorRgba = hexToRgba(currentColor);
+            console.log(
+              `Canvas: Versuche Flood Fill bei (${pos.x}, ${pos.y}) mit Ersatzfarbe: ${replacementColorRgba}`
+            ); // Log hinzugefügt
+            floodFill(pos.x, pos.y, replacementColorRgba);
+          } else {
+            drawing = true;
+            lastPos = pos;
+            ctx.beginPath();
+            ctx.moveTo(lastPos.x, lastPos.y);
+            console.log(
+              "Canvas: Zeichnen/Radieren gestartet bei:",
+              lastPos.x,
+              lastPos.y
+            );
+          }
+        }
+
+        function handleCanvasEnd(evt) {
+          if (!drawing && !filling) return;
+
+          evt.preventDefault();
+          drawing = false; // Zeichnen auf false setzen
+          lastPos = null;
+          console.log("Canvas: Zeichnen/Radieren beendet. Ereignistyp:", evt.type);
+
+          if (!filling) {
+            saveCanvasState();
+            // Zeichnen ist jetzt lokal, bis "Fertig" gedrückt wird. Keine Live-Aktualisierung in Firestore hier.
+          }
+        }
+
+        let drawLogCounter = 0;
+        function handleCanvasMove(evt) {
+          if (!drawing) return;
+          evt.preventDefault();
+          const pos = getPointerPos(evt);
+          if (lastPos) {
+            ctx.strokeStyle = erasing ? "#FFFFFF" : currentColor;
+            ctx.lineWidth = currentStroke;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+            // Keine Live-Zeichnungsaktualisierungen in Firestore bei jedem Strich, da das Zeichnen lokal ist
+          }
+          lastPos = pos;
+          drawLogCounter++;
+          if (drawLogCounter % 60 === 0) {
+            console.log(
+              `Canvas: Zeichne Linie. Ereignistyp: ${evt.type}, Aktuelle Position: (${pos.x}, ${pos.y})`
+            );
+          }
+        }
+
+        // Canvas Event Listeners
+        canvas.addEventListener("mousedown", handleCanvasStart);
+        canvas.addEventListener("touchstart", handleCanvasStart);
+        canvas.addEventListener("mouseup", handleCanvasEnd);
+        canvas.addEventListener("touchend", handleCanvasEnd);
+        canvas.addEventListener("touchcancel", handleCanvasEnd);
+        canvas.addEventListener("mousemove", handleCanvasMove);
+        canvas.addEventListener("touchmove", handleCanvasMove);
+
+        // Function to reset tool selection to default pen mode
+        function resetTools() {
+          console.log("Tools: resetTools aufgerufen.");
+          erasing = false;
+          filling = false;
+
+          document.querySelectorAll(".tool-button").forEach((button) => {
+            button.classList.remove("active");
+            button.setAttribute("aria-pressed", "false");
+          });
+
+          strokeSizeInput.disabled = false;
+          colors.forEach((c) => (c.style.pointerEvents = "auto"));
+          colorPickerInput.style.pointerEvents = "auto";
+
+          // Alle aktuellen ausgewählten Zustände entfernen
+          colors.forEach((c) => c.classList.remove("selected"));
+          colorPickerInput.classList.remove("selected-picker");
+
+          // Ausgewählten Zustand basierend auf der globalen currentColor anwenden
+          const selectedSwatch = document.querySelector(
+            `.color-swatch[data-color="${currentColor}"]`
+          );
+          if (selectedSwatch) {
+            selectedSwatch.classList.add("selected");
+          } else {
+            // Wenn currentColor keine der vordefinierten Farbfelder ist, annehmen, dass sie vom Farbwähler stammt
+            colorPickerInput.classList.add("selected-picker");
+          }
+        }
+
+        // Color selection
+        colors.forEach((colorEl) => {
+          colorEl.addEventListener("click", () => {
+            resetTools(); // Löscht alle Auswahlen
+            colorEl.classList.add("selected"); // Wählt dieses Farbfeld aus
+            currentColor = colorEl.dataset.color;
+            colorPickerInput.value = currentColor; // Farbwählerwert synchronisieren
+            console.log("Tools: Farbfeld ausgewählt:", currentColor);
+          });
+        });
+
+        colorPickerInput.addEventListener("input", () => {
+          resetTools(); // Löscht alle Auswahlen
+          currentColor = colorPickerInput.value; // Aktuelle Farbe aktualisieren
+          colorPickerInput.classList.add("selected-picker"); // Wählt den Farbwähler aus
+          console.log("Tools: Farbauswahl ausgewählt:", currentColor);
+        });
+
+        // Change stroke size
+        strokeSizeInput.addEventListener("input", () => {
+          currentStroke = parseInt(strokeSizeInput.value);
+          console.log("Tools: Stiftgröße geändert zu:", currentStroke);
+        });
+
+        // Toggle logic for eraser
+        eraserBtn.addEventListener("click", () => {
+          if (erasing) {
+            resetTools();
+            console.log("Tools: Radiergummi deaktiviert, zurück zum Stiftmodus.");
+          } else {
+            resetTools();
+            erasing = true;
+            eraserBtn.classList.add("active");
+            eraserBtn.setAttribute("aria-pressed", "true");
+            strokeSizeInput.disabled = true;
+            colors.forEach((c) => (c.style.pointerEvents = "none"));
+            colorPickerInput.style.pointerEvents = "none";
+            console.log("Tools: Radiergummi aktiviert.");
+          }
+        });
+
+        // Toggle logic for fill bucket
+        fillBucketBtn.addEventListener("click", () => {
+          if (filling) {
+            resetTools();
+            console.log("Tools: Fülleimer deaktiviert, zurück zum Stiftmodus.");
+          } else {
+            resetTools();
+            filling = true;
+            fillBucketBtn.classList.add("active");
+            fillBucketBtn.setAttribute("aria-pressed", "true");
+            strokeSizeInput.disabled = true;
+            colors.forEach((c) => (c.style.pointerEvents = "auto"));
+            colorPickerInput.style.pointerEvents = "auto";
+            console.log("Tools: Fülleimer aktiviert.");
+          }
+        });
+
+        // Clear canvas
+        clearBtn.addEventListener("click", () => {
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          console.log("Canvas: Leinwand gelöscht und mit Weiß gefüllt.");
+          saveCanvasState();
+          // Keine Live-Zeichnungsaktualisierungen beim Löschen, Zeichnen ist lokal
+        });
+
+        // Done button (submit drawing early)
+        doneBtn.addEventListener("click", async () => {
+          if (!checkFirebaseReady()) return;
+          if (gameStarted && secretWord) {
+            try {
+              const lobbySnap = await getDoc(lobbyRef);
+              let currentPlayers = [...lobbySnap.data().players];
+              const playerIndex = currentPlayers.findIndex(
+                (p) => p.id === userId
+              );
+
+              if (playerIndex !== -1) {
+                currentPlayers[playerIndex].hasFinishedDrawing = true;
+                currentPlayers[playerIndex].drawingData = canvas.toDataURL(); // Zeichnungsdaten speichern
+
+                console.log("Firebase: Spieler hat Zeichnung abgeschlossen. Aktualisiere Status.");
+                await updateDoc(lobbyRef, {
+                  players: currentPlayers, // Spieler mit meiner Zeichnung und Status aktualisieren
+                });
+                console.log(
+                  `Firebase: Spieler ${playerName} als fertig für diesen Begriff markiert und Zeichnung gespeichert.`
+                );
+                // Zeichnen lokal für diesen Spieler deaktivieren
+                canvas.style.pointerEvents = "none";
+                doneBtn.disabled = true;
+                drawingOverlay.classList.add("hidden"); // Overlay ausblenden, wenn fertig
+                if (localTimerInterval) clearInterval(localTimerInterval); // Lokalen Timer bei Fertigstellung stoppen
+                // Der onSnapshot-Listener übernimmt nun die Überprüfung des Zug-/Rundenendes
+              }
+            } catch (e) {
+              console.error("Firebase: Fehler beim Aktualisieren des Zeichenstatus/der Daten:", e);
+              window.showMessageBox(
+                "Fehler beim Speichern deiner Zeichnung. (Details in Konsole)"
+              );
+            }
+          }
+        });
+
+        // --- Game Flow Logic ---
+
+        // Start der Zeichenphase (jetzt vereinfacht, Haupt-Timer-Logik in updateVisualTimer)
+        async function startDrawingPhase() {
+          // Diese Funktion dient jetzt hauptsächlich der Canvas-Einrichtung und dem Anfangszustand,
+          // die Timer-Verwaltung wird von updateGameUI und startSynchronizedVisualTimer übernommen.
+
+          // Canvas leeren und mit Weiß füllen zu Beginn einer neuen Zeichenphase
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          saveCanvasState(); // Anfangsleeren Zustand speichern
+
+          // Aktuelle Farbe auf Schwarz zurücksetzen und UI aktualisieren
+          currentColor = "#000000";
+          colorPickerInput.value = currentColor; // Farbwählerwert setzen
+          resetTools(); // Dies wendet die ausgewählte Klasse auf das schwarze Farbfeld/den Farbwähler an
+
+          // Sicherstellen, dass das Overlay zu Beginn einer neuen Zeichenphase ausgeblendet ist
+          drawingOverlay.classList.add("hidden");
+          // canvas.style.pointerEvents und doneBtn.disabled werden jetzt von updateGameUI gehandhabt
+
+          // isDrawingPhaseActive = true; // Dies wird jetzt in updateGameUI nach dem Aufruf gesetzt
+          console.log("Game Flow: startDrawingPhase abgeschlossen.");
+        }
+
+        // Ende der Zeichenphase (nur Host)
+        async function endDrawingPhase() {
+          console.log("--- Game Flow: endDrawingPhase aufgerufen (Host-Logik) ---");
+          // Sicherstellen, dass nur der Host diese Logik ausführt
+          if (players.length > 0 && players[0].id !== userId) {
+            console.log(
+              "Game Flow: Nicht-Host versucht, endDrawingPhase aufzurufen. Abbruch."
+            );
+            return;
+          }
+
+          // Lokales Timer-Intervall für den Host stoppen
+          if (localTimerInterval) {
+            clearInterval(localTimerInterval);
+            localTimerInterval = null;
+          }
+          canvas.style.pointerEvents = "none";
+          doneBtn.disabled = true; // "Fertig"-Taste deaktivieren, wenn das Spiel übergeht
+          drawingOverlay.classList.add("hidden"); // Overlay ausblenden, wenn fertig
+          isDrawingPhaseActive = false; // Zeichenphase beendet
+
+          if (!lobbyRef) {
+            console.error(
+              "Game Flow: Lobby-Referenz ist null in endDrawingPhase. Kann nicht fortfahren."
+            );
+            window.showMessageBox("Fehler: Lobby-Referenz nicht gefunden.");
+            return;
+          }
+
+          try {
+            const currentLobbySnap = await getDoc(lobbyRef);
+            if (!currentLobbySnap.exists()) {
+              console.error(
+                "Game Flow: Lobby existiert nicht in endDrawingPhase. Kann nicht fortfahren."
+              );
+              window.showMessageBox("Fehler: Lobby existiert nicht mehr.");
+              return;
+            }
+            const currentLobbyData = currentLobbySnap.data();
+            let updatedPlayers = [...currentLobbyData.players];
+
+            // Lobby-Daten erneut abrufen, um die aktuellsten Spielerzustände zu erhalten
+            // Dieses erneute Abrufen ist wichtig, da andere Spieler ihre Zeichnungen möglicherweise
+            // kurz bevor der Host dies auslöst, eingereicht haben.
+            const latestLobbySnap = await getDoc(lobbyRef);
+            const latestLobbyData = latestLobbySnap.data();
+            const latestPlayers = latestLobbyData.players; // Neueste Spieler für Berechnungen verwenden
+
+            const nextPlayerIndexToSetWord =
+                (latestLobbyData.currentPlayerIndex + 1) % latestPlayers.length;
+            let nextRoundNumber = latestLobbyData.currentRound;
+            let newLobbyStatus;
+            let updatedCompletedRoundsData = [
+                ...(latestLobbyData.completedRoundsData || []),
+            ];
+            let currentRoundTurnsInProgress = [
+                ...(latestLobbyData.currentRoundTurnsInProgress || []),
+            ];
+
+            // Das Zugergebnis für das aktuelle geheime Wort vorbereiten
+            const currentTurnResult = {
+                playerWhoSetWordId:
+                    latestPlayers[latestLobbyData.currentPlayerIndex].id,
+                secretWord: latestLobbyData.secretWord,
+                drawings: latestPlayers.map((p) => ({
+                    playerId: p.id,
+                    playerName: p.name,
+                    drawingData: p.drawingData, // Die Zeichnung jedes Spielers für dieses geheime Wort
+                })),
+            };
+            currentRoundTurnsInProgress.push(currentTurnResult); // Zu den laufenden Zügen für die aktuelle Runde hinzufügen
+
+            // Spielerspezifisches secretWord und drawingData für die *nächste* Zeichenphase zurücksetzen
+            updatedPlayers = updatedPlayers.map((p) => ({
+                ...p,
+                secretWord: "", // Geheimes Wort für den nächsten Zug löschen
+                hasFinishedDrawing: false, // Für das nächste Wort zurücksetzen
+                drawingData: null, // Zeichnungsdaten für den nächsten Zug löschen
+            }));
+
+            // Überprüfen, ob das Ende einer vollen Runde *nachdem* das aktuelle Zugergebnis hinzugefügt wurde
+            const isEndOfRound = nextPlayerIndexToSetWord === 0;
+            const isGameFinished =
+                isEndOfRound && nextRoundNumber >= latestLobbyData.maxRrounds; // Überprüfen, ob das Spiel wirklich beendet ist
+
+            if (isEndOfRound) {
+                const newCompletedRound = {
+                    roundNumber: latestLobbyData.currentRound,
+                    turns: currentRoundTurnsInProgress,
+                };
+                updatedCompletedRoundsData.push(newCompletedRound);
+                nextRoundNumber++; // Auf die nächste Rundennummer erhöhen
+                currentRoundTurnsInProgress = []; // Für die neue Runde leeren
+            }
+
+            // Nächsten Status bestimmen
+            if (isGameFinished) {
+                newLobbyStatus = "finished";
+            } else {
+                // Wenn nicht beendet, immer zum Anzeigen der Zugergebnisse übergehen
+                newLobbyStatus = "showing-turn-results";
+            }
+
+            const payload = {
+                currentPlayerIndex: nextPlayerIndexToSetWord,
+                currentRound: nextRoundNumber,
+                currentTask: "", // Aufgabe für die nächste Wortfestlegungsphase löschen
+                secretWord: "", // Globales geheimes Wort für die nächste Wortfestlegungsphase löschen
+                drawingStartTime: null, // Zeichenstartzeit für die nächste Phase löschen
+                status: newLobbyStatus, // Dies wird 'showing-turn-results' oder 'finished' sein
+                players: updatedPlayers, // Spieler-Array mit gelöschtem Status/Daten aktualisieren
+                completedRoundsData: updatedCompletedRoundsData,
+                currentRoundTurnsInProgress: currentRoundTurnsInProgress, // Laufende Züge aktualisieren
+            };
+
+            console.log("Game Flow: Versuche, Lobby mit Payload zu aktualisieren:", payload);
+            console.log(
+                "Game Flow: Payload-Größe (KB):",
+                JSON.stringify(payload).length / 1024
+            );
+
+            await updateDoc(lobbyRef, payload);
+            console.log(
+                `Game Flow: Host wechselte zu Status: ${payload.status}, currentRound: ${nextRoundNumber}, currentPlayerIndex: ${nextPlayerIndexToSetWord}`
+            );
+          } catch (e) {
+            console.error("Game Flow: Fehler beim Übergang des Spielzustands (Host):", e);
+            console.error("Game Flow: Firestore-Fehlerdetails:", e.code, e.message); // Spezifischere Fehlerprotokollierung hinzufügen
+            window.showMessageBox(
+              "Fehler beim Übergang zur nächsten Spielphase. Details in der Konsole."
+            ); // Benutzer informieren, die Konsole zu überprüfen
+          }
+        }
+
+        // Zeigt Zeichnungen für den aktuellen Zug oder alle Zeichnungen für die abgeschlossene Runde an
+        async function showTurnOrRoundResults(hostId, lobbyData) {
+          console.log("Game Flow: showTurnOrRoundResults aufgerufen.");
+          // Geheimes Wort aus dem zuletzt abgeschlossenen Zug in den laufenden Zügen der aktuellen Runde abrufen
+          const lastCompletedTurn =
+            lobbyData.currentRoundTurnsInProgress[
+              lobbyData.currentRoundTurnsInProgress.length - 1
+            ];
+          const currentSecretWordForDisplay = lastCompletedTurn
+            ? lastCompletedTurn.secretWord
+            : "";
+
+          const drawingsForThisTurn = lastCompletedTurn?.drawings;
+          const isEndOfRound =
+            lobbyData.currentPlayerIndex % lobbyData.players.length === 0; // Überprüfen, ob der *nächste* Spieler der erste Spieler wäre, was das Ende der Runde anzeigt
+          const isGameFinished =
+            isEndOfRound && lobbyData.currentRound > lobbyData.maxRrounds; // Überprüfen, ob das Spiel wirklich beendet ist (currentRound ist bereits für die nächste Runde inkrementiert)
+
+          // Vorherigen Inhalt und Schaltflächen löschen
+          taskEl.innerHTML = "";
+          if (localTimerInterval) clearInterval(localTimerInterval); // Lokalen Timer stoppen
+          timerEl.textContent = "";
+          canvas.style.display = "none"; // Canvas ausblenden
+          document.getElementById("tools").style.display = "none"; // Tools ausblenden
+          drawingOverlay.classList.add("hidden"); // Sicherstellen, dass ausgeblendet
+
+          if (isGameFinished) {
+            console.log("Game Flow: Spiel beendet. Zeige Endergebnisse.");
+            showGameFinished(
+              hostId,
+              lobbyData.completedRoundsData,
+              lobbyData.currentRound,
+              lobbyData.maxRrounds
+            );
+            return;
+          }
+
+          let drawingsHTML = "";
+          if (isEndOfRound) {
+            // Ende einer Runde, aber nicht das Ende des Spiels
+            // Alle Züge der abgeschlossenen Runde anzeigen
+            const currentCompletedRound =
+              lobbyData.completedRoundsData[
+                lobbyData.completedRoundsData.length - 1
+              ];
+            if (currentCompletedRound && currentCompletedRound.turns) {
+              drawingsHTML += `<h2 class="text-2xl font-bold mb-4 text-center text-[#C5B8FF]">Runde ${currentCompletedRound.roundNumber} abgeschlossen!</h2>`;
+              // Züge in umgekehrter Reihenfolge durchlaufen, um den letzten Zug zuerst anzuzeigen
+              for (
+                let i = currentCompletedRound.turns.length - 1;
+                i >= 0;
+                i--
+              ) {
+                const turn = currentCompletedRound.turns[i];
+                const playerWhoSetWord = players.find(
+                  (p) => p.id === turn.playerWhoSetWordId
+                );
+                drawingsHTML += `<div class="col-span-full text-xl font-semibold mt-4 mb-2 text-[#E0E0E0]">Begriff von ${
+                  playerWhoSetWord ? playerWhoSetWord.name : "Unbekannt"
+                }: "${turn.secretWord}"</div>`;
+                turn.drawings.forEach((drawingEntry) => {
+                  const drawingSrc =
+                    drawingEntry.drawingData ||
+                    "https://placehold.co/400x200/cccccc/333333?text=Keine+Zeichnung";
+                  drawingsHTML += `
+                          <div class="bg-[#1F1B38] bg-opacity-90 p-4 rounded-lg shadow-md border border-[#4B3A9D]">
+                            <strong class="text-xl text-[#E0E0E0]">${drawingEntry.playerName}</strong>
+                            <img src="${drawingSrc}" alt="Zeichnung von ${drawingEntry.playerName}" class="mt-2 w-full h-auto rounded-lg border border-gray-700">
+                          </div>
+                        `;
+                });
+                drawingsHTML += `</div>`;
+              }
+            }
+          } else if (drawingsForThisTurn) {
+            // Ergebnisse des Zuges mitten in der Runde
+            // currentSecretWordForDisplay verwenden, das vom zuletzt abgeschlossenen Zug abgeleitet ist
+            drawingsHTML = `<h2 class="text-2xl font-bold mb-4 text-center text-[#C5B8FF]">Zeichnungen für "${currentSecretWordForDisplay}"</h2><div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
+            drawingsForThisTurn.forEach((drawingEntry) => {
+              const drawingSrc =
+                drawingEntry.drawingData ||
+                "https://placehold.co/400x200/cccccc/333333?text=Keine+Zeichnung";
+              drawingsHTML += `
+                  <div class="bg-[#1F1B38] bg-opacity-90 p-4 rounded-lg shadow-md border border-[#4B3A9D]">
+                    <strong class="text-xl text-[#E0E0E0]">${drawingEntry.playerName}</strong>
+                    <img src="${drawingSrc}" alt="Zeichnung von ${drawingEntry.playerName}" class="mt-2 w-full h-auto rounded-lg border border-gray-700">
+                  </div>
+                `;
+            });
+            drawingsHTML += `</div>`;
+          }
+
+          taskEl.innerHTML = drawingsHTML; // Zeichnungen-HTML setzen
+
+          const buttonContainer = document.createElement("div");
+          buttonContainer.className =
+            "flex flex-col md:flex-row gap-4 justify-center mt-4";
+          taskEl.appendChild(buttonContainer);
+
+          // IMMER "Zurück zur Lobby" für alle Spieler in der Ergebnisansicht anzeigen
+          let backToLobbyButton = document.createElement("button");
+          backToLobbyButton.className =
+            "w-full py-3 px-4 text-lg rounded-lg bg-blue-600 text-white styled-button font-bold shadow-md flex-1";
+          backToLobbyButton.textContent = "Zurück zur Lobby";
+          backToLobbyButton.onclick = () => resetGame();
+          buttonContainer.appendChild(backToLobbyButton);
+
+          if (userId === hostId) {
+            if (isEndOfRound) {
+              let nextRoundButton = document.createElement("button");
+              nextRoundButton.className =
+                "w-full py-3 px-4 text-lg rounded-lg bg-green-500 text-white styled-button font-bold shadow-md flex-1";
+              nextRoundButton.textContent = "Nächste Runde starten";
+              nextRoundButton.onclick = async () => {
+                if (userId === hostId) {
+                  console.log("Game Flow: Host klickte 'Nächste Runde starten'. Übergang zu In-Game.");
+                  await updateDoc(lobbyRef, { status: "in-game" });
+                }
+              };
+              buttonContainer.appendChild(nextRoundButton);
+            } else {
+              // Nicht Ende der Runde (Ergebnisse des Zuges mitten in der Runde)
+              let nextActionButton = document.createElement("button");
+              nextActionButton.className =
+                "w-full py-3 px-4 text-lg rounded-lg bg-green-500 text-white styled-button font-bold shadow-md flex-1";
+              nextActionButton.textContent = "Weiter";
+              nextActionButton.onclick = async () => {
+                if (userId === hostId) {
+                  console.log("Game Flow: Host klickte 'Weiter'. Übergang zu In-Game.");
+                  await updateDoc(lobbyRef, { status: "in-game" });
+                }
+              };
+              buttonContainer.appendChild(nextActionButton);
+            }
+          } else {
+            // Nicht Host
+            let waitingButton = document.createElement("button");
+            waitingButton.className =
+              "w-full py-3 px-4 text-lg rounded-lg bg-gray-500 text-white styled-button font-bold shadow-md flex-1 cursor-not-allowed";
+            waitingButton.textContent = "Warte auf den Host...";
+            waitingButton.disabled = true;
+            buttonContainer.appendChild(waitingButton);
+          }
+        }
+
+        // Zeigt alle Zeichnungen an, nachdem das Spiel beendet ist
+        async function showGameFinished(
+          hostId,
+          completedRoundsData,
+          currentRoundNumber,
+          maxRoundsConfigured
+        ) {
+          console.log("Game Flow: showGameFinished aufgerufen.");
+          // Vorherigen Inhalt und Schaltflächen löschen
+          taskEl.innerHTML = "";
+          if (localTimerInterval) clearInterval(localTimerInterval); // Lokalen Timer stoppen
+          timerEl.textContent = "";
+          canvas.style.display = "none"; // Canvas ausblenden
+          document.getElementById("tools").style.display = "none"; // Tools ausblenden
+          drawingOverlay.classList.add("hidden"); // Sicherstellen, dass ausgeblendet
+
+          let drawingsHTML = "";
+
+          // Alle abgeschlossenen Runden in umgekehrter Reihenfolge anzeigen (neueste zuerst)
+          for (let i = completedRoundsData.length - 1; i >= 0; i--) {
+            const round = completedRoundsData[i];
+            drawingsHTML += `<h2 class="text-2xl font-bold mb-4 text-center text-[#C5B8FF]">Runde ${round.roundNumber}:</h2><div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
+
+            // Züge in umgekehrter Reihenfolge durchlaufen, um den letzten Zug zuerst innerhalb jeder Runde anzuzeigen
+            for (let j = round.turns.length - 1; j >= 0; j--) {
+              const turn = round.turns[j];
+              const playerWhoSetWord = players.find(
+                (p) => p.id === turn.playerWhoSetWordId
+              );
+              drawingsHTML += `<div class="col-span-full text-xl font-semibold mt-4 mb-2 text-[#E0E0E0]">Begriff von ${
+                playerWhoSetWord ? playerWhoSetWord.name : "Unbekannt"
+              }: "${turn.secretWord}"</div>`;
+              turn.drawings.forEach((drawingEntry) => {
+                const drawingSrc =
+                  drawingEntry.drawingData ||
+                  "https://placehold.co/400x200/cccccc/333333?text=Keine+Zeichnung";
+                drawingsHTML += `
+                      <div class="bg-[#1F1B38] bg-opacity-90 p-4 rounded-lg shadow-md border border-[#4B3A9D]">
+                        <strong class="text-xl text-[#E0E0E0]">${drawingEntry.playerName}</strong>
+                        <img src="${drawingSrc}" alt="Zeichnung von ${drawingEntry.playerName}" class="mt-2 w-full h-auto rounded-lg border border-gray-700">
+                      </div>
+                    `;
+              });
+            }
+            drawingsHTML += `</div>`;
+          }
+
+          taskEl.innerHTML = drawingsHTML;
+          taskEl.innerHTML +=
+            '<h2 class="text-3xl font-bold mt-8 text-center text-[#C5B8FF]">Spiel beendet!</h2>';
+          timerEl.textContent = "";
+          canvas.style.display = "none";
+          document.getElementById("tools").style.display = "none";
+
+          const buttonContainer = document.createElement("div");
+          buttonContainer.className =
+            "flex flex-col md:flex-row gap-4 justify-center mt-4";
+          taskEl.appendChild(buttonContainer);
+
+          let backToLobbyButton = document.createElement("button");
+          backToLobbyButton.className =
+            "w-full py-3 px-4 text-lg rounded-lg bg-blue-600 text-white styled-button font-bold shadow-md flex-1";
+          backToLobbyButton.textContent = "Zurück zur Lobby";
+          backToLobbyButton.onclick = () => resetGame();
+          buttonContainer.appendChild(backToLobbyButton);
+        }
+
+        // Setzt den Spielzustand auf die anfängliche Lobby-Ansicht zurück
+        function resetGame() {
+          console.log("Game Flow: resetGame() aufgerufen.");
+          if (unsubscribeLobby) {
+            unsubscribeLobby();
+            console.log("Firebase: Von Lobby-Listener abgemeldet.");
+          }
+          currentLobbyCode = "";
+          lobbyRef = null;
+          players = [];
+          currentPlayerIndex = 0;
+          gameStarted = false;
+          currentTask = "";
+          secretWord = "";
+          // Timer-Intervall stoppen, falls aktiv
+          if (localTimerInterval) {
+              clearInterval(localTimerInterval);
+              localTimerInterval = null;
+          }
+
+          // Timer-Anzeige auf Standard oder anfängliche Auswahl zurücksetzen
+          // Aktuellen Wert von roundDurationSelect oder einen Standardwert verwenden, falls nicht verfügbar
+          const selectedDurationValue = roundDurationSelect ? roundDurationSelect.value : "60";
+          const defaultDuration = selectedDurationValue === "Infinity" ? Infinity : parseInt(selectedDurationValue) || 60;
+
+          if (defaultDuration === Infinity) {
+            timerEl.textContent = "∞";
+          } else {
+            timerEl.textContent = formatTime(defaultDuration);
+          }
+          taskEl.textContent = "Warte auf die nächste Aufgabe...";
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = "#FFFFFF"; // Sicherstellen, dass das Canvas beim Löschen weiß ist
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          canvasHistory = []; // Verlauf beim Zurücksetzen löschen
+          historyPointer = -1; // Verlaufszeiger zurücksetzen
+          isDrawingPhaseActive = false; // Flag zurücksetzen
+
+          // Aktuelle Farbe auf Schwarz zurücksetzen und UI aktualisieren
+          currentColor = "#000000";
+          colorPickerInput.value = currentColor;
+          resetTools(); // Dies wendet die ausgewählte Klasse auf das schwarze Farbfeld/den Farbwähler an
+
+          drawingOverlay.classList.add("hidden"); // Overlay beim Zurücksetzen ausblenden
+
+          // Nach dem Zurücksetzen immer zur Lobby-Auswahlansicht zurückkehren
+          showLobbySelection();
+
+          // Sicherstellen, dass Canvas und Werkzeuge für das nächste Spiel sichtbar sind, falls erforderlich (sie werden von showLobbySelection/showNameInput ausgeblendet)
+          // Diese Zeilen sind hier redundant, da showLobbySelection() sie auf "none" setzt.
+          // canvas.style.display = "block";
+          // document.getElementById("tools").style.display = "flex";
+          console.log("Game Flow: Spielzustand auf Lobby-Auswahlansicht zurückgesetzt.");
+        }
+
+        // Anfängliche Einrichtung für die Canvas-Reaktionsfähigkeit
+        function resizeCanvas() {
+          const container = document.getElementById("canvas-container");
+          const wasHidden = gameSection.classList.contains("hidden");
+          let currentDrawingData = null;
+
+          // Aktuellen Canvas-Inhalt speichern, wenn das Zeichnen aktiv ist und etwas zu speichern ist
+          // Wir rufen den letzten gespeicherten Zustand aus canvasHistory ab, um ihn neu zu zeichnen.
+          if (
+            isDrawingPhaseActive &&
+            historyPointer >= 0 &&
+            canvasHistory[historyPointer]
+          ) {
+            currentDrawingData = canvasHistory[historyPointer];
+            console.log(
+              "Canvas: Aktuelle Zeichnungsdaten aus dem Verlauf vor der Größenänderung speichern."
+            );
+          }
+
+          if (wasHidden) {
+            gameSection.style.display = "block";
+          }
+
+          // Neue Canvas-Dimensionen festlegen. Dadurch wird das Canvas gelöscht.
+          canvas.width = container.clientWidth;
+          // Nur für mobile Bildschirme (z.B. kleiner als 768px für md-Breakpoint) eine größere Höhe anwenden
+          if (window.innerWidth < 768) {
+            canvas.height = Math.min(container.clientWidth * 0.9, 700); // Erhöhter Faktor und maximale Höhe für Mobilgeräte
+          } else {
+            canvas.height = Math.min(container.clientWidth * 0.75, 600); // Bestehende Logik für größere Bildschirme beibehalten
+          }
+
+          if (wasHidden) {
+            gameSection.style.display = "";
+            gameSection.classList.add("hidden");
+          }
+
+          // Canvas-Inhalt wiederherstellen, falls gespeichert, sonst löschen und mit Weiß füllen
+          if (currentDrawingData) {
+            loadCanvasState(currentDrawingData); // Vorhandene loadCanvasState-Funktion verwenden
+          } else {
+            // Wenn keine Zeichnungsdaten vorhanden sind (z.B. frisches Canvas oder nach dem Löschen), einfach löschen und mit Weiß füllen
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            console.log(
+              "Canvas: Canvas nach Größenänderung gelöscht und mit Weiß gefüllt (keine vorherigen Zeichnungsdaten)."
+            );
+          }
+
+          console.log(
+            "Canvas: Canvas-Größe geändert auf:",
+            canvas.width,
+            "x",
+
+            canvas.height,
+            "Container-Breite:",
+            container.clientWidth
+          );
+        }
+
+        window.addEventListener("resize", resizeCanvas);
+        resizeCanvas();
+
+        // Sicherstellen, dass Firebase bereit ist, bevor Interaktionen zugelassen werden
+        const checkAuthInterval = setInterval(() => {
+          if (isAuthReady) {
+            clearInterval(checkAuthInterval);
+            console.log("App: Anwendung bereit für Benutzerinteraktion.");
+            showNameInput(); // Anfängliche Ansicht, wenn die App bereit ist
+          }
+        }, 100);
+      })();
+    </script>
+  </body>
+</html>
