@@ -1072,6 +1072,9 @@
 
         // Flag to ensure startDrawingPhase is called only once per drawing phase
         let isDrawingPhaseActive = false;
+        // NEU: Flag, um das Zurücksetzen des Eingabefeldes für den geheimen Begriff zu steuern
+        let isWordSettingPhaseInitialized = false;
+
 
         // Determine if the client is likely a PC (desktop)
         // This is a simple heuristic and might not be 100% accurate for all devices.
@@ -1164,6 +1167,7 @@
           console.log("Anzeige: Namenseingabe");
           updateSidebarActiveItem("sidebar-home");
           isDrawingPhaseActive = false; // Reset flag
+          isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
 
           // Sidebar anzeigen
           sidebar.style.transform = ""; // Zeigt die Sidebar an
@@ -1192,6 +1196,7 @@
           console.log("Anzeige: Lobby-Auswahl");
           updateSidebarActiveItem("sidebar-game");
           isDrawingPhaseActive = false; // Reset flag
+          isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
 
           // Sidebar anzeigen
           sidebar.style.transform = ""; // Zeigt die Sidebar an
@@ -1230,6 +1235,7 @@
           console.log("Anzeige: Lobby-Informationen");
           updateSidebarActiveItem("sidebar-lobby-info");
           isDrawingPhaseActive = false; // Reset flag
+          isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
 
           // Sidebar anzeigen
           sidebar.style.transform = ""; // Zeigt die Sidebar an
@@ -1251,6 +1257,8 @@
           setTimeout(resizeCanvas, 50);
           console.log("Anzeige: Spiel");
           updateSidebarActiveItem("sidebar-game");
+          // isWordSettingPhaseInitialized wird hier nicht direkt zurückgesetzt,
+          // da es von updateGameUI basierend auf dem Spielstatus verwaltet wird.
 
           // Sidebar ausblenden, wenn im Spielmodus
           sidebar.style.transform = "translateX(-100%)"; // Blendet die Sidebar aus
@@ -1511,6 +1519,7 @@
           if (!firebaseInitializedSuccessfully || !db || !auth) {
             window.showMessageBox(
               "Firebase ist nicht korrekt initialisiert. Bitte überprüfe deine Konfiguration und Internetverbindung."
+
             );
             console.error("Firebase nicht bereit. isAuthReady:", isAuthReady, "db:", db, "auth:", auth);
             return false;
@@ -1906,6 +1915,7 @@
             // Pass the entire lobbyData to the function
             showTurnOrRoundResults(hostId, lobbyData);
             isDrawingPhaseActive = false;
+            isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
             if (localTimerInterval) clearInterval(localTimerInterval); // Stop local timer
             timerEl.textContent = "";
             canvas.style.pointerEvents = "none"; // Disable drawing during results
@@ -1931,6 +1941,7 @@
             colorPickerInput.value = currentColor; // Sync picker value
             resetTools(); // Reset tool selection
             isDrawingPhaseActive = false; // Ensure it's false for word setting
+            isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
             drawingOverlay.classList.add("hidden"); // Ensure hidden
             if (localTimerInterval) clearInterval(localTimerInterval); // Lokalen Timer stoppen
             timerEl.textContent = "00:00"; // Timer-Anzeige zurücksetzen
@@ -1967,13 +1978,19 @@
               taskEl.textContent = `Deine Aufgabe: ${lobbyData.currentTask}`;
               secretWordMessage.textContent = `Was möchtest du zu "${lobbyData.currentTask}" zeichnen?`;
             }
-            secretWordInput.value = ""; // Eingabefeld für neuen Begriff leeren
+            
+            // NEU: Nur das Eingabefeld leeren, wenn diese Phase zum ersten Mal für den aktuellen Spieler betreten wird
+            if (!isWordSettingPhaseInitialized) {
+                secretWordInput.value = ""; // Eingabefeld für neuen Begriff leeren
+                wordSuggestionsDiv.innerHTML = ''; // Vorschläge leeren
+                isWordSettingPhaseInitialized = true; // Flag setzen
+            }
+
             secretWordModal.classList.remove("hidden");
             canvas.style.pointerEvents = "none"; // Canvas deaktivieren, während das Wort festgelegt wird
             canvas.classList.remove("drawing-active");
             doneBtn.disabled = true; // "Fertig"-Taste in dieser Phase deaktiviert
             suggestWordBtn.disabled = false; // Vorschlagen-Button aktivieren
-            wordSuggestionsDiv.innerHTML = ''; // Vorschläge leeren
             if (localTimerInterval) clearInterval(localTimerInterval); // Lokalen Timer stoppen
             timerEl.textContent = "00:00"; // Timer-Anzeige zurücksetzen
             drawingOverlay.classList.add("hidden"); // Sicherstellen, dass Overlay ausgeblendet ist
@@ -1984,6 +2001,7 @@
           }
           // Phase 2: Zeichnen (für alle Spieler, sobald secretWord festgelegt ist)
           else if (lobbyData.secretWord) {
+            isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen, da wir aus der Wort-Setz-Phase heraus sind
             secretWordModal.classList.add("hidden");
             taskEl.textContent = `Zeichne: ${lobbyData.secretWord}`; // Das geheime Wort anzeigen
 
@@ -2063,6 +2081,7 @@
           }
           // Phase 3: Warten auf geheimes Wort (für Spieler, die das Wort nicht festlegen)
           else {
+            isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen, da wir aus der Wort-Setz-Phase heraus sind
             console.log("Game UI: Warte auf geheimes Wort.");
             secretWordModal.classList.add("hidden");
             canvas.style.pointerEvents = "none";
@@ -2517,6 +2536,7 @@
           doneBtn.disabled = true; // "Fertig"-Taste deaktivieren, wenn das Spiel übergeht
           drawingOverlay.classList.add("hidden"); // Overlay ausblenden, wenn fertig
           isDrawingPhaseActive = false; // Zeichenphase beendet
+          isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
 
           if (!lobbyRef) {
             console.error(
@@ -2656,6 +2676,8 @@
           canvas.style.display = "none"; // Canvas ausblenden
           document.getElementById("tools").style.display = "none"; // Tools ausblenden
           drawingOverlay.classList.add("hidden"); // Sicherstellen, dass ausgeblendet
+          isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
+
 
           if (isGameFinished) {
             console.log("Game Flow: Spiel beendet. Zeige Endergebnisse.");
@@ -2791,6 +2813,8 @@
           canvas.style.display = "none"; // Canvas ausblenden
           document.getElementById("tools").style.display = "none"; // Tools ausblenden
           drawingOverlay.classList.add("hidden"); // Sicherstellen, dass ausgeblendet
+          isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
+
 
           let drawingsHTML = "";
 
@@ -2880,6 +2904,8 @@
           canvasHistory = []; // Verlauf beim Zurücksetzen löschen
           historyPointer = -1; // Verlaufszeiger zurücksetzen
           isDrawingPhaseActive = false; // Flag zurücksetzen
+          isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
+
 
           // Aktuelle Farbe auf Schwarz zurücksetzen und UI aktualisieren
           currentColor = "#000000";
