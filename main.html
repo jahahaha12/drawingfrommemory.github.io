@@ -1070,10 +1070,10 @@
         let historyPointer = -1;
         const MAX_HISTORY_SIZE = 20;
 
-        // Flag to ensure startDrawingPhase is called only once per drawing phase
-        let isDrawingPhaseActive = false;
-        // NEU: Flag, um das Zurücksetzen des Eingabefeldes für den geheimen Begriff zu steuern
-        let isWordSettingPhaseInitialized = false;
+        // Flags to manage UI state and prevent re-initialization
+        let lastKnownSecretWord = ""; // Track the last secret word to detect changes
+        let isDrawingPhaseActive = false; // Flag to ensure startDrawingPhase is called only once per drawing phase
+        let isWordSettingPhaseInitialized = false; // Flag to control secret word input field reset
 
 
         // Determine if the client is likely a PC (desktop)
@@ -1168,6 +1168,7 @@
           updateSidebarActiveItem("sidebar-home");
           isDrawingPhaseActive = false; // Reset flag
           isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
+          lastKnownSecretWord = ""; // Reset for new game flow
 
           // Sidebar anzeigen
           sidebar.style.transform = ""; // Zeigt die Sidebar an
@@ -1197,6 +1198,7 @@
           updateSidebarActiveItem("sidebar-game");
           isDrawingPhaseActive = false; // Reset flag
           isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
+          lastKnownSecretWord = ""; // Reset for new game flow
 
           // Sidebar anzeigen
           sidebar.style.transform = ""; // Zeigt die Sidebar an
@@ -1236,6 +1238,7 @@
           updateSidebarActiveItem("sidebar-lobby-info");
           isDrawingPhaseActive = false; // Reset flag
           isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
+          lastKnownSecretWord = ""; // Reset for new game flow
 
           // Sidebar anzeigen
           sidebar.style.transform = ""; // Zeigt die Sidebar an
@@ -1897,10 +1900,19 @@
 
         // Updates the game UI based on new lobby data
         function updateGameUI(gameStatus, hostId, lobbyData) {
-          // No need for `if (!gameStarted) return;` here, as this function is only called if game has started.
-
           const currentPlayerToSetWord = players[currentPlayerIndex];
           const myPlayerObject = players.find((p) => p.id === userId);
+
+          // Reset flags at the beginning of each update based on general state
+          // These resets are crucial to prevent re-triggering drawing phase setup
+          if (gameStatus !== "in-game" || !lobbyData.secretWord) {
+            isDrawingPhaseActive = false;
+          }
+          // isWordSettingPhaseInitialized wird nur zurückgesetzt, wenn ein geheimes Wort gesetzt ist (Zeichenphase)
+          if (lobbyData.secretWord) {
+            isWordSettingPhaseInitialized = false;
+          }
+
 
           // Hide overlay by default for new updates
           drawingOverlay.classList.add("hidden");
@@ -1912,53 +1924,30 @@
 
 
           if (gameStatus === "showing-turn-results" || gameStatus === "finished") {
-            // Pass the entire lobbyData to the function
             showTurnOrRoundResults(hostId, lobbyData);
-            isDrawingPhaseActive = false;
-            isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
-            if (localTimerInterval) clearInterval(localTimerInterval); // Stop local timer
+            if (localTimerInterval) clearInterval(localTimerInterval);
             timerEl.textContent = "";
             canvas.style.pointerEvents = "none"; // Disable drawing during results
-            doneBtn.disabled = true; // Disable done button during results
-            drawingOverlay.classList.add("hidden"); // Ensure hidden
-            canvas.style.display = "none"; // Canvas ausblenden
-            document.getElementById("tools").style.display = "none"; // Tools ausblenden
+            doneBtn.disabled = true;
+            drawingOverlay.classList.add("hidden");
+            canvas.style.display = "none";
+            document.getElementById("tools").style.display = "none";
+            lastKnownSecretWord = ""; // Reset for next game/round
             return;
-          }
-
-          // Clear canvas when a new word-setting phase starts (secretWord is empty)
-          if (
-            gameStatus === "in-game" &&
-            !lobbyData.secretWord &&
-            !isDrawingPhaseActive
-          ) {
-            console.log("Game UI: Leere Canvas für neue Wort-Setz-Phase.");
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#FFFFFF";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            saveCanvasState();
-            currentColor = "#000000"; // Reset color to black
-            colorPickerInput.value = currentColor; // Sync picker value
-            resetTools(); // Reset tool selection
-            isDrawingPhaseActive = false; // Ensure it's false for word setting
-            isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
-            drawingOverlay.classList.add("hidden"); // Ensure hidden
-            if (localTimerInterval) clearInterval(localTimerInterval); // Lokalen Timer stoppen
-            timerEl.textContent = "00:00"; // Timer-Anzeige zurücksetzen
           }
 
           // Phase 1: Setting the secret word (only for the designated player)
           if (
+            gameStatus === "in-game" &&
             currentPlayerToSetWord &&
             currentPlayerToSetWord.id === userId &&
             !lobbyData.secretWord
           ) {
             console.log("Game UI: Aktueller Spieler setzt das Wort.");
-            // Wenn ich an der Reihe bin, das Wort zu setzen, und noch keine Aufgabe zugewiesen ist, wähle eine aus und aktualisiere Firestore
             if (!lobbyData.currentTask) {
               const availableTasks = allTasks.filter(
                 (task) => !lobbyData.tasksAssigned.includes(task)
-              ); // Filtert bereits zugewiesene Aufgaben heraus
+              );
               const newTask =
                 availableTasks.length > 0
                   ? availableTasks[
@@ -1966,7 +1955,6 @@
                     ]
                   : allTasks[Math.floor(Math.random() * allTasks.length)];
 
-              // currentTask in Firestore aktualisieren. Dies löst onSnapshot für alle Clients aus.
               if (lobbyRef) {
                 console.log("Game UI: Host setzt neue Aufgabe:", newTask);
                 updateDoc(lobbyRef, { currentTask: newTask });
@@ -1974,90 +1962,88 @@
               taskEl.textContent = `Deine Aufgabe: ${newTask}`;
               secretWordMessage.textContent = `Was möchtest du zu "${newTask}" zeichnen?`;
             } else {
-              // Wenn die Aufgabe für diese Runde bereits in Firestore existiert, diese verwenden
               taskEl.textContent = `Deine Aufgabe: ${lobbyData.currentTask}`;
               secretWordMessage.textContent = `Was möchtest du zu "${lobbyData.currentTask}" zeichnen?`;
             }
             
-            // NEU: Nur das Eingabefeld leeren, wenn diese Phase zum ersten Mal für den aktuellen Spieler betreten wird
             if (!isWordSettingPhaseInitialized) {
-                secretWordInput.value = ""; // Eingabefeld für neuen Begriff leeren
-                wordSuggestionsDiv.innerHTML = ''; // Vorschläge leeren
-                isWordSettingPhaseInitialized = true; // Flag setzen
+                secretWordInput.value = "";
+                wordSuggestionsDiv.innerHTML = '';
+                // Canvas leeren, wenn dieser Spieler an der Reihe ist, das Wort zu setzen
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "#FFFFFF";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                saveCanvasState(); // Leeren Zustand speichern
+                currentColor = "#000000";
+                colorPickerInput.value = currentColor;
+                resetTools();
+                isWordSettingPhaseInitialized = true;
             }
 
             secretWordModal.classList.remove("hidden");
-            canvas.style.pointerEvents = "none"; // Canvas deaktivieren, während das Wort festgelegt wird
+            canvas.style.pointerEvents = "none";
             canvas.classList.remove("drawing-active");
-            doneBtn.disabled = true; // "Fertig"-Taste in dieser Phase deaktiviert
-            suggestWordBtn.disabled = false; // Vorschlagen-Button aktivieren
-            if (localTimerInterval) clearInterval(localTimerInterval); // Lokalen Timer stoppen
-            timerEl.textContent = "00:00"; // Timer-Anzeige zurücksetzen
-            drawingOverlay.classList.add("hidden"); // Sicherstellen, dass Overlay ausgeblendet ist
-            canvas.style.display = "block"; // Canvas sichtbar lassen, aber deaktiviert
-            document.getElementById("tools").style.display = "flex"; // Tools sichtbar lassen, aber deaktiviert
-
-            isDrawingPhaseActive = false; // Sicherstellen, dass die Zeichenphase noch nicht aktiv ist
+            doneBtn.disabled = true;
+            suggestWordBtn.disabled = false;
+            if (localTimerInterval) clearInterval(localTimerInterval);
+            timerEl.textContent = "00:00";
+            drawingOverlay.classList.add("hidden");
+            canvas.style.display = "block";
+            document.getElementById("tools").style.display = "flex";
+            lastKnownSecretWord = ""; // Reset last known word when setting a new one
           }
           // Phase 2: Zeichnen (für alle Spieler, sobald secretWord festgelegt ist)
           else if (lobbyData.secretWord) {
-            isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen, da wir aus der Wort-Setz-Phase heraus sind
+            taskEl.textContent = `Zeichne: ${lobbyData.secretWord}`;
             secretWordModal.classList.add("hidden");
-            taskEl.textContent = `Zeichne: ${lobbyData.secretWord}`; // Das geheime Wort anzeigen
 
-            // Überprüfen, ob dies eine neue Zeichenphase für den aktuellen Benutzer ist
-            // und ob der Benutzer seine Zeichnung noch nicht beendet hat
-            if (myPlayerObject && !myPlayerObject.hasFinishedDrawing && !isDrawingPhaseActive) {
-                console.log("Game UI: Starte Zeichenphase für neuen Begriff.");
-                startDrawingPhase(); // Diese Funktion löscht das Canvas und setzt den Anfangszustand
-                isDrawingPhaseActive = true; // Zeichenphase für diesen Client als aktiv markieren
+            // Check if it's a new drawing word for this client's turn
+            // This is the crucial part to prevent re-clearing
+            if (!isDrawingPhaseActive && myPlayerObject && !myPlayerObject.hasFinishedDrawing && lobbyData.secretWord !== lastKnownSecretWord) {
+                console.log("Game UI: Starte NEUE Zeichenphase für neuen Begriff (nach secretWord-Festlegung).");
+                startDrawingPhase(); // This clears the canvas and sets initial state
+                isDrawingPhaseActive = true; // Mark as active for this client
             }
+            lastKnownSecretWord = lobbyData.secretWord; // Update last known word
 
-            // Wenn die Timer-Dauer unendlich ist, Unendlich-Symbol anzeigen und Zeichnen aktivieren
-            if (lobbyData.timerDuration === Infinity) {
-                timerEl.textContent = "∞";
+            // If the current player has finished drawing, disable their canvas
+            if (myPlayerObject && myPlayerObject.hasFinishedDrawing) {
+                canvas.style.pointerEvents = "none";
+                doneBtn.disabled = true;
+                drawingOverlay.classList.add("hidden");
+                if (localTimerInterval) clearInterval(localTimerInterval);
+                timerEl.textContent = "Warte auf andere Spieler...";
+                console.log("Game UI: Mein Spieler hat Zeichnung beendet, Canvas deaktiviert.");
+            } else {
+                // Otherwise, enable drawing and manage timer
                 canvas.style.pointerEvents = "auto";
                 canvas.classList.add("drawing-active");
                 drawingOverlay.classList.add("hidden");
-                doneBtn.disabled = players.find(p => p.id === userId)?.hasFinishedDrawing;
-                if (localTimerInterval) clearInterval(localTimerInterval); // Vorhandenes Intervall stoppen
-                console.log("Game UI: Timer auf Unendlich gesetzt.");
-            } else {
-                // Lokalen visuellen Timer basierend auf dem Server-Timestamp starten oder aktualisieren
-                const drawingStartTime = lobbyData.drawingStartTime?.toDate();
-                if (drawingStartTime) {
-                    console.log("Game UI: Timer: drawingStartTime von Firestore:", drawingStartTime);
-                    console.log("Game UI: Timer: aktuelle timerDuration:", lobbyData.timerDuration);
-                    
-                    let effectiveDuration = lobbyData.timerDuration;
-                    // Wenn der Spieler ein PC-Spieler ist und die Dauer nicht unendlich ist, 10 Sekunden abziehen
-                    if (isPCPlayer && effectiveDuration !== Infinity) {
-                        effectiveDuration = Math.max(0, effectiveDuration - 10);
-                        console.log("Game UI: Timer: PC-Spieler (-10s). Effektive Dauer:", effectiveDuration);
-                    } else {
-                        console.log("Game UI: Timer: Kein PC-Spieler oder unendliche Dauer. Effektive Dauer:", effectiveDuration);
-                    }
+                doneBtn.disabled = false; // Re-enable if not finished
 
-
-                    startSynchronizedVisualTimer(drawingStartTime, effectiveDuration);
+                if (lobbyData.timerDuration === Infinity) {
+                    timerEl.textContent = "∞";
+                    if (localTimerInterval) clearInterval(localTimerInterval);
                 } else {
-                    // Wenn secretWord gesetzt ist, aber drawingStartTime noch nicht verfügbar ist, warte darauf.
-                    console.warn("Game UI: drawingStartTime nicht verfügbar, warte auf Synchronisation.");
-                    timerEl.textContent = "Synchronisiere Timer..."; // Zeigt den Wartezustand an
-                    canvas.style.pointerEvents = "none"; // Zeichenfunktion deaktivieren, bis der Timer bereit ist
-                    canvas.classList.remove("drawing-active");
-                    doneBtn.disabled = true;
-                    drawingOverlay.classList.add("hidden"); // Sicherstellen, dass ausgeblendet
-                    if (localTimerInterval) clearInterval(localTimerInterval); // Vorhandenes Intervall stoppen
+                    const drawingStartTime = lobbyData.drawingStartTime?.toDate();
+                    if (drawingStartTime) {
+                        let effectiveDuration = lobbyData.timerDuration;
+                        if (isPCPlayer && effectiveDuration !== Infinity) {
+                            effectiveDuration = Math.max(0, effectiveDuration - 10);
+                        }
+                        startSynchronizedVisualTimer(drawingStartTime, effectiveDuration);
+                    } else {
+                        console.warn("Game UI: drawingStartTime nicht verfügbar, warte auf Synchronisation.");
+                        timerEl.textContent = "Synchronisiere Timer...";
+                        canvas.style.pointerEvents = "none"; // Temporarily disable if no start time
+                        doneBtn.disabled = true;
+                    }
                 }
             }
             
-            // Vorschlagen-Button und Vorschläge ausblenden
             suggestWordBtn.disabled = true;
             wordSuggestionsDiv.innerHTML = '';
 
-
-            // Überprüfen, ob die aktuelle Zeichenphase für dieses Wort beendet ist (alle Spieler fertig)
             const allPlayersFinishedDrawingForCurrentWord = players.every(
               (p) => p.hasFinishedDrawing
             );
@@ -2073,23 +2059,21 @@
                   "Game UI: Nicht-Host-Client hat erkannt, dass alle Spieler fertig sind, wartet auf den Host zum Übergang."
                 );
                 canvas.style.pointerEvents = "none";
-                doneBtn.disabled = true; // "Fertig"-Taste deaktivieren, wenn alle Spieler fertig sind und auf den Host warten
-                if (localTimerInterval) clearInterval(localTimerInterval); // Lokalen Timer stoppen
-                drawingOverlay.classList.add("hidden"); // Sicherstellen, dass Overlay ausgeblendet ist
+                doneBtn.disabled = true;
+                if (localTimerInterval) clearInterval(localTimerInterval);
+                drawingOverlay.classList.add("hidden");
               }
             }
           }
           // Phase 3: Warten auf geheimes Wort (für Spieler, die das Wort nicht festlegen)
           else {
-            isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen, da wir aus der Wort-Setz-Phase heraus sind
-            console.log("Game UI: Warte auf geheimes Wort.");
             secretWordModal.classList.add("hidden");
             canvas.style.pointerEvents = "none";
             canvas.classList.remove("drawing-active");
             doneBtn.disabled = true;
-            suggestWordBtn.disabled = true; // Vorschlagen-Button deaktivieren
-            wordSuggestionsDiv.innerHTML = ''; // Vorschläge leeren
-            drawingOverlay.classList.add("hidden"); // Sicherstellen, dass Overlay ausgeblendet ist
+            suggestWordBtn.disabled = true;
+            wordSuggestionsDiv.innerHTML = '';
+            drawingOverlay.classList.add("hidden");
             if (currentPlayerToSetWord) {
               taskEl.textContent = `Warte auf ${
                 currentPlayerToSetWord.name
@@ -2099,9 +2083,9 @@
             } else {
               taskEl.textContent = "Warte auf die nächste Runde...";
             }
-            if (localTimerInterval) clearInterval(localTimerInterval); // Lokalen Timer stoppen
-            timerEl.textContent = "00:00"; // Timer-Anzeige zurücksetzen
-            isDrawingPhaseActive = false; // Flag zurücksetzen, da die Zeichenphase nicht aktiv ist
+            if (localTimerInterval) clearInterval(localTimerInterval);
+            timerEl.textContent = "00:00";
+            lastKnownSecretWord = ""; // Reset last known word when waiting for a new one
           }
         }
 
@@ -2537,6 +2521,7 @@
           drawingOverlay.classList.add("hidden"); // Overlay ausblenden, wenn fertig
           isDrawingPhaseActive = false; // Zeichenphase beendet
           isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
+          lastKnownSecretWord = ""; // Reset for the next turn
 
           if (!lobbyRef) {
             console.error(
@@ -2677,6 +2662,7 @@
           document.getElementById("tools").style.display = "none"; // Tools ausblenden
           drawingOverlay.classList.add("hidden"); // Sicherstellen, dass ausgeblendet
           isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
+          lastKnownSecretWord = ""; // Reset for new game flow
 
 
           if (isGameFinished) {
@@ -2814,6 +2800,7 @@
           document.getElementById("tools").style.display = "none"; // Tools ausblenden
           drawingOverlay.classList.add("hidden"); // Sicherstellen, dass ausgeblendet
           isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
+          lastKnownSecretWord = ""; // Reset for new game flow
 
 
           let drawingsHTML = "";
@@ -2905,6 +2892,7 @@
           historyPointer = -1; // Verlaufszeiger zurücksetzen
           isDrawingPhaseActive = false; // Flag zurücksetzen
           isWordSettingPhaseInitialized = false; // NEU: Flag zurücksetzen
+          lastKnownSecretWord = ""; // NEU: lastKnownSecretWord zurücksetzen
 
 
           // Aktuelle Farbe auf Schwarz zurücksetzen und UI aktualisieren
