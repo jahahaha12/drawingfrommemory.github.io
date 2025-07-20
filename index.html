@@ -1704,7 +1704,7 @@
 
         // Leave Lobby Button
         leaveLobbyBtn.addEventListener("click", async () => {
-          if (!checkFirebaseReady() || !lobbyRef) return;
+          if (!checkFirebaseReady()) return;
 
           try {
             const lobbySnap = await getDoc(lobbyRef);
@@ -1861,14 +1861,19 @@
                 hasFinishedDrawing: false,
                 drawingData: null,
               }));
+
+              // Select the initial task for the first player (currentPlayerIndex: 0)
+              const initialAssignedTasks = []; // No tasks assigned yet for a new game
+              const initialTask = allTasks[Math.floor(Math.random() * allTasks.length)];
+
               console.log("Firebase: Starte Spiel. Setze initialPlayers und Status.");
               await updateDoc(lobbyRef, {
                 gameStarted: true,
                 status: "in-game", // Set status to in-game
                 currentPlayerIndex: 0, // Start with the first player setting the word
-                tasksAssigned: [], // To track assigned tasks (reset for new game)
+                tasksAssigned: [initialTask], // Assign the first task immediately
                 players: initialPlayers, // Update players with reset states
-                currentTask: "", // Clear current task
+                currentTask: initialTask, // Set the initial task here
                 secretWord: "", // Clear global secret word
                 drawingStartTime: null, // Ensure no start time is set initially
                 currentRound: 1, // Start at round 1
@@ -1943,44 +1948,24 @@
             !lobbyData.secretWord
           ) {
             console.log("Game UI: Aktueller Spieler setzt das Wort.");
-            // Wenn ich an der Reihe bin, das Wort zu setzen, und noch keine Aufgabe zugewiesen ist, wähle eine aus und aktualisiere Firestore
-            if (!lobbyData.currentTask) {
-              const availableTasks = allTasks.filter(
-                (task) => !lobbyData.tasksAssigned.includes(task)
-              ); // Filtert bereits zugewiesene Aufgaben heraus
-              const newTask =
-                availableTasks.length > 0
-                  ? availableTasks[
-                      Math.floor(Math.random() * availableTasks.length)
-                    ]
-                  : allTasks[Math.floor(Math.random() * allTasks.length)];
+            // The task for this round should already exist in Firestore, use it
+            taskEl.textContent = `Deine Aufgabe: ${lobbyData.currentTask}`;
+            secretWordMessage.textContent = `Was möchtest du zu "${lobbyData.currentTask}" zeichnen?`;
 
-              // currentTask in Firestore aktualisieren. Dies löst onSnapshot für alle Clients aus.
-              if (lobbyRef) {
-                console.log("Game UI: Host setzt neue Aufgabe:", newTask);
-                updateDoc(lobbyRef, { currentTask: newTask });
-              }
-              taskEl.textContent = `Deine Aufgabe: ${newTask}`;
-              secretWordMessage.textContent = `Was möchtest du zu "${newTask}" zeichnen?`;
-            } else {
-              // Wenn die Aufgabe für diese Runde bereits in Firestore existiert, diese verwenden
-              taskEl.textContent = `Deine Aufgabe: ${lobbyData.currentTask}`;
-              secretWordMessage.textContent = `Was möchtest du zu "${lobbyData.currentTask}" zeichnen?`;
-            }
-            secretWordInput.value = ""; // Eingabefeld für neuen Begriff leeren
+            secretWordInput.value = ""; // Clear input field for new term
             secretWordModal.classList.remove("hidden");
-            canvas.style.pointerEvents = "none"; // Canvas deaktivieren, während das Wort festgelegt wird
+            canvas.style.pointerEvents = "none"; // Disable canvas while word is being set
             canvas.classList.remove("drawing-active");
-            doneBtn.disabled = true; // "Fertig"-Taste in dieser Phase deaktiviert
-            suggestWordBtn.disabled = false; // Vorschlagen-Button aktivieren
-            wordSuggestionsDiv.innerHTML = ''; // Vorschläge leeren
-            if (localTimerInterval) clearInterval(localTimerInterval); // Lokalen Timer stoppen
-            timerEl.textContent = "00:00"; // Timer-Anzeige zurücksetzen
-            drawingOverlay.classList.add("hidden"); // Sicherstellen, dass Overlay ausgeblendet ist
-            canvas.style.display = "block"; // Canvas sichtbar lassen, aber deaktiviert
-            document.getElementById("tools").style.display = "flex"; // Tools sichtbar lassen, aber deaktiviert
+            doneBtn.disabled = true; // "Done" button disabled in this phase
+            suggestWordBtn.disabled = false; // Enable suggest button
+            wordSuggestionsDiv.innerHTML = ''; // Clear suggestions
+            if (localTimerInterval) clearInterval(localTimerInterval); // Stop local timer
+            timerEl.textContent = "00:00"; // Reset timer display
+            drawingOverlay.classList.add("hidden"); // Ensure overlay is hidden
+            canvas.style.display = "block"; // Keep canvas visible but disabled
+            document.getElementById("tools").style.display = "flex"; // Keep tools visible but disabled
 
-            isDrawingPhaseActive = false; // Sicherstellen, dass die Zeichenphase noch nicht aktiv ist
+            isDrawingPhaseActive = false; // Ensure drawing phase is not active yet
           }
           // Phase 2: Zeichnen (für alle Spieler, sobald secretWord festgelegt ist)
           else if (lobbyData.secretWord) {
@@ -2556,31 +2541,36 @@
                 ...(latestLobbyData.currentRoundTurnsInProgress || []),
             ];
 
-            // Das Zugergebnis für das aktuelle geheime Wort vorbereiten
+            // The task that was just drawn (currentTask from latestLobbyData) should be added to tasksAssigned
+            const tasksAssigned = new Set(latestLobbyData.tasksAssigned || []);
+            if (latestLobbyData.currentTask) {
+                tasksAssigned.add(latestLobbyData.currentTask);
+            }
+
+            // The turn result for the *just completed* turn
             const currentTurnResult = {
-                playerWhoSetWordId:
-                    latestPlayers[latestLobbyData.currentPlayerIndex].id,
+                playerWhoSetWordId: latestPlayers[latestLobbyData.currentPlayerIndex].id,
                 secretWord: latestLobbyData.secretWord,
                 drawings: latestPlayers.map((p) => ({
                     playerId: p.id,
                     playerName: p.name,
-                    drawingData: p.drawingData, // Die Zeichnung jedes Spielers für dieses geheime Wort
+                    drawingData: p.drawingData, // The drawing of each player for this secret word
                 })),
             };
-            currentRoundTurnsInProgress.push(currentTurnResult); // Zu den laufenden Zügen für die aktuelle Runde hinzufügen
+            currentRoundTurnsInProgress.push(currentTurnResult); // Add to ongoing turns for the current round
 
-            // Spielerspezifisches secretWord und drawingData für die *nächste* Zeichenphase zurücksetzen
+            // Reset player-specific secretWord and drawingData for the *next* drawing phase
             updatedPlayers = updatedPlayers.map((p) => ({
                 ...p,
-                secretWord: "", // Geheimes Wort für den nächsten Zug löschen
-                hasFinishedDrawing: false, // Für das nächste Wort zurücksetzen
-                drawingData: null, // Zeichnungsdaten für den nächsten Zug löschen
+                secretWord: "", // Clear secret word for the next turn
+                hasFinishedDrawing: false, // Reset for the next word
+                drawingData: null, // Clear drawing data for the next turn
             }));
 
-            // Überprüfen, ob das Ende einer vollen Runde *nachdem* das aktuelle Zugergebnis hinzugefügt wurde
+            // Check if it's the end of a full round *after* adding the current turn result
             const isEndOfRound = nextPlayerIndexToSetWord === 0;
             const isGameFinished =
-                isEndOfRound && nextRoundNumber >= latestLobbyData.maxRrounds; // Überprüfen, ob das Spiel wirklich beendet ist
+                isEndOfRound && nextRoundNumber >= latestLobbyData.maxRrounds; // Check if the game is truly finished
 
             if (isEndOfRound) {
                 const newCompletedRound = {
@@ -2588,46 +2578,47 @@
                     turns: currentRoundTurnsInProgress,
                 };
                 updatedCompletedRoundsData.push(newCompletedRound);
-                nextRoundNumber++; // Auf die nächste Rundennummer erhöhen
-                currentRoundTurnsInProgress = []; // Für die neue Runde leeren
+                nextRoundNumber++; // Increment to the next round number
+                currentRoundTurnsInProgress = []; // Clear for the new round
             }
 
-            // Nächsten Status bestimmen
+            // Determine next status
             if (isGameFinished) {
                 newLobbyStatus = "finished";
             } else {
-                // Wenn nicht beendet, immer zum Anzeigen der Zugergebnisse übergehen
+                // If not finished, always transition to showing turn results
                 newLobbyStatus = "showing-turn-results";
             }
 
             const payload = {
                 currentPlayerIndex: nextPlayerIndexToSetWord,
                 currentRound: nextRoundNumber,
-                currentTask: "", // Aufgabe für die nächste Wortfestlegungsphase löschen
-                secretWord: "", // Globales geheimes Wort für die nächste Wortfestlegungsphase löschen
-                drawingStartTime: null, // Zeichenstartzeit für die nächste Phase löschen
-                status: newLobbyStatus, // Dies wird 'showing-turn-results' oder 'finished' sein
-                players: updatedPlayers, // Spieler-Array mit gelöschtem Status/Daten aktualisieren
+                currentTask: "", // Clear the task here. It will be set by the host on "Weiter" click.
+                secretWord: "", // Clear global secret word for the next word-setting phase
+                drawingStartTime: null, // Clear drawing start time for the next phase
+                status: newLobbyStatus, // This will be 'showing-turn-results' or 'finished'
+                players: updatedPlayers, // Update players array with cleared status/data
                 completedRoundsData: updatedCompletedRoundsData,
-                currentRoundTurnsInProgress: currentRoundTurnsInProgress, // Laufende Züge aktualisieren
+                currentRoundTurnsInProgress: currentRoundTurnsInProgress, // Update ongoing turns
+                tasksAssigned: Array.from(tasksAssigned) // Update assigned tasks
             };
 
-            console.log("Game Flow: Versuche, Lobby mit Payload zu aktualisieren:", payload);
+            console.log("Game Flow: Attempting to update lobby with payload:", payload);
             console.log(
-                "Game Flow: Payload-Größe (KB):",
+                "Game Flow: Payload size (KB):",
                 JSON.stringify(payload).length / 1024
             );
 
             await updateDoc(lobbyRef, payload);
             console.log(
-                `Game Flow: Host wechselte zu Status: ${payload.status}, currentRound: ${nextRoundNumber}, currentPlayerIndex: ${nextPlayerIndexToSetWord}`
+                `Game Flow: Host transitioned to status: ${payload.status}, currentRound: ${nextRoundNumber}, currentPlayerIndex: ${nextPlayerIndexToSetWord}`
             );
           } catch (e) {
-            console.error("Game Flow: Fehler beim Übergang des Spielzustands (Host):", e);
-            console.error("Game Flow: Firestore-Fehlerdetails:", e.code, e.message); // Spezifischere Fehlerprotokollierung hinzufügen
+            console.error("Game Flow: Error transitioning game state (Host):", e);
+            console.error("Game Flow: Firestore error details:", e.code, e.message); // Add more specific error logging
             window.showMessageBox(
-              "Fehler beim Übergang zur nächsten Spielphase. Details in der Konsole."
-            ); // Benutzer informieren, die Konsole zu überprüfen
+              "Error transitioning to the next game phase. Check console for details."
+            ); // Inform user to check console
           }
         }
 
@@ -2747,7 +2738,27 @@
               nextRoundButton.onclick = async () => {
                 if (userId === hostId) {
                   console.log("Game Flow: Host klickte 'Nächste Runde starten'. Übergang zu In-Game.");
-                  await updateDoc(lobbyRef, { status: "in-game" });
+                  const lobbySnap = await getDoc(lobbyRef);
+                  const currentLobbyData = lobbySnap.data();
+                  const assignedTasks = new Set(currentLobbyData.tasksAssigned || []);
+                  const nextPlayerIndex = currentLobbyData.currentPlayerIndex; // This should be 0 at end of round
+                  const nextPlayer = currentLobbyData.players[nextPlayerIndex];
+
+                  // Select a new task for the next round's first player
+                  const availableTasks = allTasks.filter(
+                    (task) => !assignedTasks.has(task)
+                  );
+                  const newTask =
+                    availableTasks.length > 0
+                      ? availableTasks[
+                          Math.floor(Math.random() * availableTasks.length)
+                        ]
+                      : allTasks[Math.floor(Math.random() * allTasks.length)];
+
+                  await updateDoc(lobbyRef, {
+                    status: "in-game",
+                    currentTask: newTask // Set the task here
+                  });
                 }
               };
               buttonContainer.appendChild(nextRoundButton);
@@ -2760,7 +2771,27 @@
               nextActionButton.onclick = async () => {
                 if (userId === hostId) {
                   console.log("Game Flow: Host klickte 'Weiter'. Übergang zu In-Game.");
-                  await updateDoc(lobbyRef, { status: "in-game" });
+                  const lobbySnap = await getDoc(lobbyRef);
+                  const currentLobbyData = lobbySnap.data();
+                  const assignedTasks = new Set(currentLobbyData.tasksAssigned || []);
+                  const nextPlayerIndex = currentLobbyData.currentPlayerIndex; // This is the player whose turn it is next
+                  const nextPlayer = currentLobbyData.players[nextPlayerIndex];
+
+                  // Select a new task for the next player
+                  const availableTasks = allTasks.filter(
+                    (task) => !assignedTasks.has(task)
+                  );
+                  const newTask =
+                    availableTasks.length > 0
+                      ? availableTasks[
+                          Math.floor(Math.random() * availableTasks.length)
+                        ]
+                      : allTasks[Math.floor(Math.random() * allTasks.length)];
+
+                  await updateDoc(lobbyRef, {
+                    status: "in-game",
+                    currentTask: newTask // Set the task here
+                  });
                 }
               };
               buttonContainer.appendChild(nextActionButton);
